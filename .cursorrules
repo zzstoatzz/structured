@@ -1,0 +1,3 @@
+this is 2025. we use list not List, dict not Dict, | not Union or Optional
+
+stylistically lower case everything, only uppercase when idiomatic
