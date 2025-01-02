@@ -1,5 +1,8 @@
 # structured
 
+> [!NOTE]
+> see [demo](https://x.com/Nathan_Nowack/status/1874650896753479902)
+
 a tool for generating structured outputs from natural language prompts.
 
 ## setup
