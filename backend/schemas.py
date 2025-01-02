@@ -1,8 +1,9 @@
 """Schemas for the backend"""
 
+import asyncio
 import inspect
 from datetime import datetime
-from typing import Annotated, Any, ClassVar, TypedDict
+from typing import Annotated, Any, ClassVar, Literal, TypedDict
 
 from pydantic import BaseModel, ConfigDict, Field, create_model
 from pydantic_core import from_json, to_json
@@ -19,6 +20,7 @@ TYPE_MAP: dict[str, type] = {
     'boolean': bool,
     'float': float,
     'list': list,
+    'array': list,
     'dict': dict,
     'datetime': datetime,
     'number': float,
@@ -104,13 +106,34 @@ def retrieve_custom_schemas() -> dict[str, type[BaseModel]]:
     }
 
 
+### Built-in schemas
+
+
+class WhatPokemonAmI(_Schema):
+    """a pokemon representative of a personality"""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(
+        title='What Pokemon Am I?',
+        json_schema_extra={
+            'prompt': 'Tell me about yourself',
+        },
+    )
+
+    name: str = Field(description='The name of the pokemon')
+    type: str = Field(description='The type of the pokemon')
+    description: str = Field(description='A short description of the pokemon')
+    rarity: Literal['common', 'uncommon', 'rare', 'epic', 'legendary'] = Field(
+        description='The rarity of the pokemon'
+    )
+
+
 class SQLQuery(_Schema):
-    """a query and optional parameters"""
+    """a SQL query from natural language"""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(
         title='SQL Query',
         json_schema_extra={
-            'prompt': 'Describe in natural language what data you want'
+            'prompt': 'Describe your desired SQL in natural language',
         },
     )
 
@@ -164,8 +187,46 @@ assert NewSchema.__doc__ is not None, 'pigs are flying'
 NewSchema.__doc__ += f"""\n\nYou may only use the following types: {', '.join(TYPE_MAP.keys())}"""
 
 
-SCHEMAS: dict[str, type[BaseModel]] = {
-    k: v
-    for k, v in globals().items()
-    if inspect.isclass(v) and issubclass(v, _Schema) and v is not _Schema
-}
+class SchemaService:
+    """Thread-safe service for managing schemas"""
+
+    def __init__(self) -> None:
+        """Initialize the schema service"""
+        self._schemas: dict[str, type[BaseModel]] = {
+            k: v
+            for k, v in globals().items()
+            if inspect.isclass(v)
+            and issubclass(v, _Schema)
+            and v is not _Schema
+        }
+        self._lock = asyncio.Lock()
+
+    async def get_all(self) -> dict[str, type[BaseModel]]:
+        """Get all schemas including custom ones"""
+        async with self._lock:
+            self._schemas.update(retrieve_custom_schemas())
+            return self._schemas
+
+    async def get(self, name: str) -> type[BaseModel] | None:
+        """Get a schema by name"""
+        async with self._lock:
+            self._schemas.update(retrieve_custom_schemas())
+            return self._schemas.get(name)
+
+    async def save_custom(self, schema: dict[str, Any]) -> None:
+        """Save a custom schema"""
+        async with self._lock:
+            save_custom_schema(schema)
+            self._schemas.update(retrieve_custom_schemas())
+
+    async def delete(self, name: str) -> None:
+        """Delete a schema"""
+        async with self._lock:
+            if name in self._schemas and name not in retrieve_custom_schemas():
+                raise ValueError(f'Cannot delete built-in schema {name}')
+
+            delete_custom_schema(name)
+            self._schemas.pop(name, None)
+
+
+schema_service = SchemaService()

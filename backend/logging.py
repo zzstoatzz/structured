@@ -58,5 +58,5 @@ def setup_logging(level: Optional[str] = None) -> None:
 
     # add rich handler if none exists
     if not logger.handlers:
-        handler = RichHandler(rich_tracebacks=True, markup=True, show_time=False)
+        handler = RichHandler(rich_tracebacks=True, markup=True, show_time=True)
         logger.addHandler(handler)
