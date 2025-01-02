@@ -97,44 +97,42 @@ export function OutputDisplay({ response, schema }: OutputDisplayProps) {
 
     return (
         <Card className="bg-earth-50 border-earth-200">
-            <CardHeader className="flex flex-row items-center justify-between pb-2 pt-4 px-6">
-                <div className="flex items-center w-full">
-                    <Tabs defaultValue="form" className="flex-1">
-                        <div className="flex items-center justify-between w-full">
-                            <TabsList className="grid w-[200px] grid-cols-2">
-                                <TabsTrigger value="form" className="flex items-center gap-2">
-                                    <FileText className="h-4 w-4" />
-                                    Form
-                                </TabsTrigger>
-                                <TabsTrigger value="json" className="flex items-center gap-2">
-                                    <Code className="h-4 w-4" />
-                                    JSON
-                                </TabsTrigger>
-                            </TabsList>
-                            <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-8 w-8 p-0"
-                                onClick={copyToClipboard}
-                            >
-                                {copied ? <Check className="h-4 w-4 text-earth-600" /> : <Copy className="h-4 w-4 text-earth-400" />}
-                            </Button>
+            <Tabs defaultValue="form" className="flex-1">
+                <CardHeader className="flex flex-row items-center justify-between pb-2 pt-4 px-6">
+                    <TabsList className="grid w-[200px] grid-cols-2">
+                        <TabsTrigger value="form" className="flex items-center gap-2">
+                            <FileText className="h-4 w-4" />
+                            Form
+                        </TabsTrigger>
+                        <TabsTrigger value="json" className="flex items-center gap-2">
+                            <Code className="h-4 w-4" />
+                            JSON
+                        </TabsTrigger>
+                    </TabsList>
+                    <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8 p-0"
+                        onClick={copyToClipboard}
+                    >
+                        {copied ? <Check className="h-4 w-4 text-earth-600" /> : <Copy className="h-4 w-4 text-earth-400" />}
+                    </Button>
+                </CardHeader>
+                <CardContent className="pt-2">
+                    <TabsContent value="form" className="space-y-4 mt-0">
+                        {formData && Object.entries(formData).map(([key, value]) =>
+                            renderFormField(key, value)
+                        )}
+                    </TabsContent>
+                    <TabsContent value="json" className="mt-0">
+                        <div className="relative">
+                            <pre className="whitespace-pre font-mono text-sm text-earth-800 bg-background rounded-md p-4 overflow-auto max-h-[400px]">
+                                {JSON.stringify(formData, null, 2)}
+                            </pre>
                         </div>
-                        <CardContent className="pt-2">
-                            <TabsContent value="form" className="space-y-4 mt-0">
-                                {formData && Object.entries(formData).map(([key, value]) =>
-                                    renderFormField(key, value)
-                                )}
-                            </TabsContent>
-                            <TabsContent value="json" className="mt-0">
-                                <pre className="whitespace-pre-wrap font-mono text-sm text-earth-800 bg-background rounded-md p-4">
-                                    {JSON.stringify(formData, null, 2)}
-                                </pre>
-                            </TabsContent>
-                        </CardContent>
-                    </Tabs>
-                </div>
-            </CardHeader>
+                    </TabsContent>
+                </CardContent>
+            </Tabs>
         </Card>
     )
 } 

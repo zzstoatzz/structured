@@ -160,6 +160,10 @@ class NewSchema(_Schema):
     )
 
 
+assert NewSchema.__doc__ is not None, 'pigs are flying'
+NewSchema.__doc__ += f"""\n\nYou may only use the following types: {', '.join(TYPE_MAP.keys())}"""
+
+
 SCHEMAS: dict[str, type[BaseModel]] = {
     k: v
     for k, v in globals().items()
