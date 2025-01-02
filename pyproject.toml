@@ -17,7 +17,7 @@ dependencies = [
 dev = ["ruff", "ipython"]
 
 [tool.ruff]
-line-length = 120
+line-length = 80
 target-version = "py39"
 
 

@@ -28,7 +28,9 @@ def create_agent[T](result_type: type[T]) -> Agent[None, T]:
     return agent
 
 
-async def prompt_for_structured_output[T](result_type: type[T], prompt: str) -> T:
+async def prompt_for_structured_output[T](
+    result_type: type[T], prompt: str
+) -> T:
     """Prompt for structured output"""
     logger.debug(f'Prompting for structured output: {prompt}')
     result = await create_agent(result_type).run(prompt)
