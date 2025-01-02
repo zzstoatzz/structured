@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 interface OutputDisplayProps {
     response: string
+    schema?: any
 }
 
 export function OutputDisplay({ response }: OutputDisplayProps) {
