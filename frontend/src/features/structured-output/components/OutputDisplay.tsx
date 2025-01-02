@@ -8,10 +8,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 interface OutputDisplayProps {
     response: string
-    schema?: any
 }
 
-export function OutputDisplay({ response, schema }: OutputDisplayProps) {
+export function OutputDisplay({ response }: OutputDisplayProps) {
     const [copied, setCopied] = useState(false)
     const [formData, setFormData] = useState<any>(null)
 
