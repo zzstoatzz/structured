@@ -8,13 +8,15 @@ requires-python = ">=3.12"
 dependencies = [
     "fastapi",
     "uvicorn",
-    "pydantic-ai-slim[openai]",
-    "pydantic-settings",
+    "marvin@git+https://github.com/PrefectHQ/marvin-3.git@fix-target-type",
 ]
 
 
 [project.optional-dependencies]
 dev = ["ruff", "ipython"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [tool.ruff]
 line-length = 80

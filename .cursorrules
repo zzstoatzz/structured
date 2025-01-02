@@ -1,3 +1,9 @@
 this is 2025. we use list not List, dict not Dict, | not Union or Optional
 
 stylistically lower case everything, only uppercase when idiomatic
+
+we use `uv` not `pip`
+- `uv sync` to install dependencies (`--dev`, `--all-extras`, etc.)
+- `uv run` is awesome! you can provide any bash, python, or even url of a python script to run
+- `uvx` is an alias for `uv tool run`
+- `uvx prefect server start` for example, installs prefect ephemerally and starts the server

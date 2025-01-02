@@ -2,6 +2,7 @@
 
 from typing import Any
 
+import marvin
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -14,7 +15,6 @@ from .schemas import (
     retrieve_custom_schemas,
     save_custom_schema,
 )
-from .structured_outputs import prompt_for_structured_output
 
 logger = get_logger(__name__)
 
@@ -61,8 +61,9 @@ async def generate_structured_output(
             status_code=404, detail=f'Schema {schema_name} not found'
         )
 
-    schema = SCHEMAS[schema_name]
-    result = await prompt_for_structured_output(schema, request.prompt)
+    result = await marvin.cast_async(
+        request.prompt, target=SCHEMAS[schema_name]
+    )
 
     if schema_name == 'NewSchema':
         save_custom_schema(result.model_dump())
