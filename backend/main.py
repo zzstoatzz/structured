@@ -8,7 +8,12 @@ from pydantic import BaseModel
 
 from . import VERSION
 from .logging import get_logger
-from .schemas import SCHEMAS, retrieve_custom_schemas, save_custom_schema
+from .schemas import (
+    SCHEMAS,
+    delete_custom_schema,
+    retrieve_custom_schemas,
+    save_custom_schema,
+)
 from .structured_outputs import prompt_for_structured_output
 
 logger = get_logger(__name__)
@@ -65,3 +70,27 @@ async def generate_structured_output(
         SCHEMAS.update(retrieve_custom_schemas())
 
     return result.model_dump()
+
+
+@app.delete('/schemas/{schema_name}')
+async def delete_schema(schema_name: str) -> dict[str, str]:
+    """Delete a custom schema"""
+    try:
+        # Don't allow deletion of built-in schemas
+        if (
+            schema_name in SCHEMAS
+            and schema_name not in retrieve_custom_schemas()
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail=f'Cannot delete built-in schema {schema_name}',
+            )
+
+        delete_custom_schema(schema_name)
+        # Remove from SCHEMAS if it exists
+        SCHEMAS.pop(schema_name, None)
+        return {'message': f'Schema {schema_name} deleted successfully'}
+    except FileNotFoundError:
+        raise HTTPException(
+            status_code=404, detail=f'Schema {schema_name} not found'
+        )

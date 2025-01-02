@@ -22,9 +22,7 @@ class Settings(BaseSettings):
     log_level: str = 'INFO'
     """Log level"""
 
-    custom_schema_storage: Path = Path(
-        '~/.structured_outputs/custom_schemas'
-    ).expanduser()
+    custom_schema_storage: Path = Path('.custom_schemas').expanduser()
     """Directory to store custom schemas"""
 
     @model_validator(mode='after')

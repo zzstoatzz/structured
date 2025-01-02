@@ -64,6 +64,45 @@ export function StructuredOutputGenerator() {
         }
     }
 
+    const handleSchemaSelect = (value: string) => {
+        setSelectedSchema(value)
+        setInput('')
+        setResponse('')
+    }
+
+    const handleSchemaDelete = async (schemaName: string) => {
+        try {
+            console.log('Deleting schema:', schemaName)  // Debug log
+            const response = await fetch(`http://localhost:8000/schemas/${schemaName}`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            })
+
+            if (!response.ok) {
+                const errorText = await response.text()
+                throw new Error(`Failed to delete schema: ${errorText}`)
+            }
+
+            // Refresh schemas after deletion
+            const schemasResponse = await fetch('http://localhost:8000/schemas')
+            if (schemasResponse.ok) {
+                const schemas = await schemasResponse.json()
+                setSchemas(schemas)
+                // If the deleted schema was selected, clear the selection
+                if (selectedSchema === schemaName) {
+                    setSelectedSchema('')
+                    setInput('')
+                    setResponse('')
+                }
+            }
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to delete schema')
+            console.error('Error deleting schema:', err)
+        }
+    }
+
     return (
         <div className="structured-output-container">
             <div className="structured-output">
@@ -79,7 +118,8 @@ export function StructuredOutputGenerator() {
                                 <SchemaSelector
                                     schemas={schemas}
                                     selectedSchema={selectedSchema}
-                                    onSchemaSelect={setSelectedSchema}
+                                    onSchemaSelect={handleSchemaSelect}
+                                    onSchemaDelete={handleSchemaDelete}
                                 />
                                 <InputSection
                                     input={input}

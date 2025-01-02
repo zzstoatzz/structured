@@ -21,6 +21,9 @@ TYPE_MAP: dict[str, type] = {
     'list': list,
     'dict': dict,
     'datetime': datetime,
+    'number': float,
+    'date': datetime,
+    'object': dict,
 }
 
 
@@ -65,7 +68,9 @@ def create_model_from_schema(schema: dict[str, Any]) -> type[BaseModel]:
     custom_model.model_config = ConfigDict(
         title=schema['name'],
         json_schema_extra={
-            'prompt': schema['description'],
+            'prompt': 'Provide text to structure as a '
+            + schema['name']
+            + ' object',
             'example': schema.get('example'),
         },
     )
@@ -78,6 +83,15 @@ def save_custom_schema(schema: dict[str, Any]) -> None:
     (settings.custom_schema_storage / f"{schema['name']}.json").write_bytes(
         to_json(custom_model.model_json_schema())
     )
+
+
+def delete_custom_schema(schema_name: str) -> None:
+    """Delete a custom schema from disk"""
+    schema_path = settings.custom_schema_storage / f'{schema_name}.json'
+    if schema_path.exists():
+        schema_path.unlink()
+    else:
+        raise FileNotFoundError(f'Schema {schema_name} not found')
 
 
 def retrieve_custom_schemas() -> dict[str, type[BaseModel]]:
