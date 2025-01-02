@@ -21,7 +21,7 @@ interface SchemaSelectorProps {
     onSchemaDelete?: (schemaName: string) => void
 }
 
-const BUILTIN_SCHEMAS = ['SQLQuery', 'ExecutiveSummary', 'NewSchema']
+const BUILTIN_SCHEMAS = ['SQLQuery', 'ExecutiveSummary', 'NewSchema', 'WhatPokemonAmI']
 
 export function SchemaSelector({ schemas, selectedSchema, onSchemaSelect, onSchemaDelete }: SchemaSelectorProps) {
     const [schemaToDelete, setSchemaToDelete] = useState<string | null>(null)
