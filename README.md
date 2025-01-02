@@ -36,7 +36,7 @@ npm run dev
 
 - `backend/`: FastAPI server that handles structured output generation
   - `main.py`: API endpoints
-  - `schemas.py`: pydantic models for structured outputs (yes, i know i could be using [this](https://docs.pydantic.dev/latest/integrations/datamodel_code_generator/))
+  - `schemas.py`: pydantic models for structured outputs (yes, i could have chosen to use [this](https://docs.pydantic.dev/latest/integrations/datamodel_code_generator/) - feel free to open a PR!)
   - `structured_outputs.py`: core logic for generating structured outputs
 
 - `frontend/`: React + TypeScript + Tailwind UI
