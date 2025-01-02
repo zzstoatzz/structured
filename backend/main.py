@@ -61,9 +61,8 @@ async def generate_structured_output(
             status_code=404, detail=f'Schema {schema_name} not found'
         )
 
-    result = await marvin.cast_async(
-        request.prompt, target=SCHEMAS[schema_name]
-    )
+    schema = SCHEMAS[schema_name]
+    result = await marvin.cast_async(request.prompt, target=schema)
 
     if schema_name == 'NewSchema':
         save_custom_schema(result.model_dump())

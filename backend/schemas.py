@@ -2,7 +2,7 @@
 
 import inspect
 from datetime import datetime
-from typing import Annotated, Any, ClassVar, TypedDict
+from typing import Annotated, Any, ClassVar, Literal, TypedDict
 
 from pydantic import BaseModel, ConfigDict, Field, create_model
 from pydantic_core import from_json, to_json
@@ -19,6 +19,7 @@ TYPE_MAP: dict[str, type] = {
     'boolean': bool,
     'float': float,
     'list': list,
+    'array': list,
     'dict': dict,
     'datetime': datetime,
     'number': float,
@@ -104,6 +105,27 @@ def retrieve_custom_schemas() -> dict[str, type[BaseModel]]:
     }
 
 
+### Built-in schemas
+
+
+class WhatPokemonAmI(_Schema):
+    """a pokemon representative of your personality"""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(
+        title='What Pokemon Am I?',
+        json_schema_extra={
+            'prompt': 'Describe your personality in a few sentences',
+        },
+    )
+
+    name: str = Field(description='The name of the pokemon')
+    type: str = Field(description='The type of the pokemon')
+    description: str = Field(description='A short description of the pokemon')
+    rarity: Literal['common', 'uncommon', 'rare', 'epic', 'legendary'] = Field(
+        description='The rarity of the pokemon'
+    )
+
+
 class SQLQuery(_Schema):
     """a query and optional parameters"""
 
@@ -163,6 +185,8 @@ class NewSchema(_Schema):
 assert NewSchema.__doc__ is not None, 'pigs are flying'
 NewSchema.__doc__ += f"""\n\nYou may only use the following types: {', '.join(TYPE_MAP.keys())}"""
 
+
+### Register schemas
 
 SCHEMAS: dict[str, type[BaseModel]] = {
     k: v
