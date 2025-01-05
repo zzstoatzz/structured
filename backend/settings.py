@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     log_level: Literal['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'] = 'INFO'
     """Log level"""
 
-    database_url: str = 'sqlite:///./schemas.db'
+    database_url: str = 'sqlite:///./app.db'
     """Database URL"""
 
     @model_validator(mode='after')
@@ -39,7 +39,7 @@ class Settings(BaseSettings):
     @model_validator(mode='after')
     def setup_logging(self) -> Self:
         """Setup logging"""
-        from .logging import get_logger
+        from .loggers import get_logger
 
         logger = get_logger(__name__)
         logger.setLevel(self.log_level)

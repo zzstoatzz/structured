@@ -1,10 +1,10 @@
 """Schema management"""
 
-from marvin.utilities.logging import get_logger
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from .database import Schema, get_session, init_db
+from .loggers import get_logger
 
 logger = get_logger(__name__)
 
@@ -33,6 +33,7 @@ class SchemaDefinition(BaseModel):
         description='list of fields in the schema, each with name, type (string/integer/boolean/number/list/dict), and description',
     )
     is_builtin: bool = False  # default to False for new schemas
+    version: int = 1  # default to version 1
 
 
 # Built-in schemas
@@ -60,9 +61,10 @@ BUILTIN_SCHEMAS = {
             SchemaField(
                 name='fields',
                 type='list',
-                description='List of fields in the schema, each with name, type (string/integer/boolean/number/list/dict), and description',
+                description='List of fields in the schema. Each field should be a dictionary with name, type (string/integer/boolean/number/list/dict), and description',
             ),
         ],
+        is_builtin=True,
     ),
     'WhatPokemonAmI': SchemaDefinition(
         name='WhatPokemonAmI',
@@ -137,13 +139,20 @@ class SchemaService:
         """Initialize built-in schemas"""
         for name, schema in BUILTIN_SCHEMAS.items():
             # check if schema already exists
-            if not self.get(name):
+            stored = (
+                self.session.query(Schema)
+                .filter(Schema.name == name, Schema.is_latest == True)
+                .first()
+            )
+            if not stored:
                 stored = Schema(
                     name=name,
                     description=schema.description,
                     prompt=schema.prompt,
                     fields=[field.model_dump() for field in schema.fields],
                     is_builtin=True,
+                    version=1,
+                    is_latest=True,
                 )
                 try:
                     self.session.add(stored)
@@ -153,8 +162,8 @@ class SchemaService:
                     self.session.rollback()
 
     def get_all(self) -> dict[str, SchemaDefinition]:
-        """Get all schemas"""
-        stmt = select(Schema)
+        """Get all latest schema versions"""
+        stmt = select(Schema).where(Schema.is_latest == True)
         results = self.session.execute(stmt).scalars().all()
         return {
             schema.name: SchemaDefinition(
@@ -163,57 +172,102 @@ class SchemaService:
                 prompt=schema.prompt,
                 fields=[SchemaField(**field) for field in schema.fields],
                 is_builtin=schema.is_builtin,
+                version=schema.version,
             )
             for schema in results
         }
 
     def get(self, name: str) -> SchemaDefinition | None:
-        """Get a schema by name"""
-        stmt = select(Schema).where(Schema.name == name)
-        result = self.session.execute(stmt).scalar_one_or_none()
-        if result:
-            return SchemaDefinition(
-                name=result.name,
-                description=result.description,
-                prompt=result.prompt,
-                fields=[SchemaField(**field) for field in result.fields],
+        """Get latest version of a schema by name"""
+        try:
+            stmt = select(Schema).where(
+                Schema.name == name, Schema.is_latest == True
             )
-        return None
+            result = self.session.execute(stmt).scalar_one_or_none()
+            if result:
+                return SchemaDefinition(
+                    name=result.name,
+                    description=result.description,
+                    prompt=result.prompt,
+                    fields=[SchemaField(**field) for field in result.fields],
+                    is_builtin=result.is_builtin,
+                    version=result.version,
+                )
+            return None
+        except Exception as e:
+            logger.error(f'Failed to get schema {name}: {e}')
+            return None
 
     def create(self, schema: SchemaDefinition) -> None:
         """Create or update a schema"""
-        # get existing schema to preserve is_builtin flag
-        stmt = select(Schema).where(Schema.name == schema.name)
-        existing = self.session.execute(stmt).scalar_one_or_none()
+        try:
+            # get existing latest version
+            existing = self.session.execute(
+                select(Schema).where(
+                    Schema.name == schema.name, Schema.is_latest == True
+                )
+            ).scalar_one_or_none()
 
-        stored = Schema(
-            name=schema.name,
-            description=schema.description,
-            prompt=schema.prompt,
-            fields=[field.model_dump() for field in schema.fields],
-            is_builtin=existing.is_builtin if existing else False,
-        )
+            # Convert fields to JSON-serializable format
+            serialized_fields = [field.model_dump() for field in schema.fields]
 
-        if existing:
-            # Update existing schema
-            existing.description = stored.description
-            existing.prompt = stored.prompt
-            existing.fields = stored.fields
-        else:
-            # Create new schema
-            self.session.add(stored)
+            if existing:
+                # Mark current version as not latest
+                existing.is_latest = False
 
-        self.session.commit()
+                # Create new version
+                new_version = Schema(
+                    name=schema.name,
+                    description=schema.description,
+                    prompt=schema.prompt,
+                    fields=serialized_fields,
+                    is_builtin=existing.is_builtin,
+                    version=existing.version + 1,
+                    parent_id=existing.id,
+                    is_latest=True,
+                )
+                self.session.add(new_version)
+            else:
+                # Create new schema
+                new_schema = Schema(
+                    name=schema.name,
+                    description=schema.description,
+                    prompt=schema.prompt,
+                    fields=serialized_fields,
+                    is_builtin=False,
+                    version=1,
+                    is_latest=True,
+                )
+                self.session.add(new_schema)
+
+            self.session.commit()
+        except Exception as e:
+            logger.error(f'Failed to create/update schema {schema.name}: {e}')
+            self.session.rollback()
+            raise
 
     def delete(self, name: str) -> None:
-        """Delete a schema"""
-        stmt = select(Schema).where(Schema.name == name)
-        schema = self.session.execute(stmt).scalar_one_or_none()
-        if schema:
-            if schema.is_builtin:
-                raise ValueError(f'Cannot delete built-in schema {name}')
-            self.session.delete(schema)
-            self.session.commit()
+        """Delete all versions of a schema"""
+        try:
+            schema = self.session.execute(
+                select(Schema).where(
+                    Schema.name == name, Schema.is_latest == True
+                )
+            ).scalar_one_or_none()
+
+            if schema:
+                if schema.is_builtin:
+                    raise ValueError(f'Cannot delete built-in schema {name}')
+
+                # Delete all versions of this schema
+                self.session.query(Schema).filter(Schema.name == name).delete()
+                self.session.commit()
+            else:
+                raise ValueError(f'Schema {name} not found')
+        except Exception as e:
+            logger.error(f'Failed to delete schema {name}: {e}')
+            self.session.rollback()
+            raise
 
 
 schema_service = SchemaService()

@@ -1,6 +1,10 @@
+"""loggers.py
+
+Logging configuration.
+"""
+
 import logging
 from functools import lru_cache
-from typing import Optional
 
 from rich.console import Console
 from rich.logging import RichHandler
@@ -24,7 +28,7 @@ def configure_logging() -> None:
 
 
 @lru_cache
-def get_logger(name: Optional[str] = None) -> logging.Logger:
+def get_logger(name: str | None = None) -> logging.Logger:
     """Retrieves a logger with the given name, or the root logger if no name is given.
 
     Args:

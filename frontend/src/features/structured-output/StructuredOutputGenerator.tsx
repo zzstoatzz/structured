@@ -20,6 +20,7 @@ export function StructuredOutputGenerator({ className = '' }: Props) {
     const [error, setError] = useState<string>('')
     const [hasGenerations, setHasGenerations] = useState(false)
     const [lastGenerationTime, setLastGenerationTime] = useState<number>(0)
+    const [updateTrigger, setUpdateTrigger] = useState<number>(0)
 
     useEffect(() => {
         const fetchSchemas = async () => {
@@ -130,9 +131,12 @@ export function StructuredOutputGenerator({ className = '' }: Props) {
             if (!schemasResponse.ok) throw new Error('Failed to fetch schemas')
             const data = await schemasResponse.json()
             setSchemas(data)
+
+            setUpdateTrigger(Date.now())
         } catch (err) {
             setError('Failed to update schema')
             console.error('Error updating schema:', err)
+            throw err
         }
     }
 
@@ -201,7 +205,10 @@ export function StructuredOutputGenerator({ className = '' }: Props) {
                         `}
                     >
                         <div className="space-y-4">
-                            <SchemaVersionHistory schemaName={selectedSchema || null} />
+                            <SchemaVersionHistory
+                                schemaName={selectedSchema || null}
+                                updateTrigger={updateTrigger}
+                            />
                             <GenerationHistory
                                 schemaName={selectedSchema || null}
                                 updateTrigger={lastGenerationTime}
