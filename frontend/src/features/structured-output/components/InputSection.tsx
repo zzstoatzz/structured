@@ -44,20 +44,20 @@ export function InputSection({
                 onChange={(e) => onInputChange(e.target.value)}
                 placeholder={placeholder}
                 disabled={!selectedSchema || isLoading}
-                className={`min-h-[120px] resize-none transition-opacity duration-200 ${isLoading ? 'opacity-50' : ''}`}
+                className={`min-h-[160px] md:min-h-[120px] text-base md:text-sm p-4 md:p-3 resize-none transition-opacity duration-200 ${isLoading ? 'opacity-50' : ''}`}
             />
             <Button
                 onClick={onSubmit}
                 disabled={isDisabled}
-                className="w-full"
+                className="w-full min-h-[2.75rem] md:min-h-0"
             >
                 {isLoading ? (
                     <div className="flex items-center justify-center gap-2">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        <span>Generating...</span>
+                        <Loader2 className="h-5 w-5 md:h-4 md:w-4 animate-spin" />
+                        <span className="text-base md:text-sm">Generating...</span>
                     </div>
                 ) : (
-                    <span>Generate (⌘ + Enter)</span>
+                    <span className="text-base md:text-sm">Generate (⌘ + Enter)</span>
                 )}
             </Button>
         </div>

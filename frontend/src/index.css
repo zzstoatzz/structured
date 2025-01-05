@@ -107,12 +107,11 @@
 
 /* Code block styling */
 pre {
-  @apply p-4 my-4 overflow-x-auto;
+  @apply p-4 my-4 overflow-x-auto font-mono;
   background-color: hsl(var(--code-bg));
   color: hsl(var(--code-fg));
   border: 1px solid hsl(var(--code-border));
   border-radius: var(--radius);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   line-height: 1.5;
 }
 

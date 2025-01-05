@@ -10,10 +10,10 @@ clean:
 	find . -type f -name "*.pyc" -delete
 
 api:
-	uv run uvicorn backend.main:app --reload
+	uv run uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
 
 ui:
-	cd frontend && bun dev
+	cd frontend && bun dev --host 0.0.0.0
 
 upgrade:
 	PYTHONPATH=. uv run alembic upgrade head
