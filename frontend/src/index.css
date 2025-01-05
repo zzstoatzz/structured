@@ -13,7 +13,7 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
 
-    --primary: 222.2 47.4% 11.2%;
+    --primary: 221.2 83.2% 53.3%;
     --primary-foreground: 210 40% 98%;
 
     --secondary: 210 40% 96.1%;
@@ -30,9 +30,23 @@
 
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --ring: 221.2 83.2% 53.3%;
 
     --radius: 0.5rem;
+
+    /* Code block colors - light mode */
+    --code-bg: 220 14% 96%;
+    --code-fg: 220 40% 20%;
+    --code-border: 220 13% 91%;
+    --code-toolbar: 220 14% 98%;
+    --code-selection: 220 50% 90%;
+    --code-highlight: 220 50% 93%;
+    --code-comment: 220 10% 50%;
+    --code-keyword: 221 70% 45%;
+    --code-string: 120 50% 35%;
+    --code-number: 35 90% 40%;
+    --code-variable: 220 40% 30%;
+    --code-function: 280 60% 45%;
   }
 
   .dark {
@@ -45,7 +59,7 @@
     --popover: 222 47% 8%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 210 40% 98%;
+    --primary: 217.2 91.2% 59.8%;
     --primary-foreground: 222.2 47.4% 11.2%;
 
     --secondary: 217.2 32.6% 12%;
@@ -62,7 +76,21 @@
 
     --border: 217.2 32.6% 12%;
     --input: 217.2 32.6% 12%;
-    --ring: 212.7 26.8% 83.9%;
+    --ring: 224.3 76.3% 48%;
+
+    /* Code block colors - dark mode */
+    --code-bg: 222 47% 11%;
+    --code-fg: 220 14% 90%;
+    --code-border: 220 13% 16%;
+    --code-toolbar: 222 47% 9%;
+    --code-selection: 220 50% 30%;
+    --code-highlight: 220 50% 20%;
+    --code-comment: 220 10% 60%;
+    --code-keyword: 221 70% 65%;
+    --code-string: 120 50% 65%;
+    --code-number: 35 90% 60%;
+    --code-variable: 220 40% 80%;
+    --code-function: 280 60% 75%;
   }
 }
 
@@ -78,6 +106,7 @@
 
 /* Code block styling */
 pre {
+  @apply p-4 my-4 overflow-x-auto;
   background-color: hsl(var(--code-bg));
   color: hsl(var(--code-fg));
   border: 1px solid hsl(var(--code-border));
@@ -86,7 +115,61 @@ pre {
   line-height: 1.5;
 }
 
+pre code {
+  @apply text-sm;
+}
+
+pre ::selection {
+  background-color: hsl(var(--code-selection));
+}
+
 .code-toolbar {
+  @apply px-4 py-2 flex items-center justify-between;
   background-color: hsl(var(--code-toolbar));
   border-bottom: 1px solid hsl(var(--code-border));
+}
+
+/* Syntax highlighting */
+.token.comment {
+  color: hsl(var(--code-comment));
+}
+
+.token.keyword {
+  color: hsl(var(--code-keyword));
+}
+
+.token.string {
+  color: hsl(var(--code-string));
+}
+
+.token.number {
+  color: hsl(var(--code-number));
+}
+
+.token.function {
+  color: hsl(var(--code-function));
+}
+
+/* Structured output styling */
+.structured-output {
+  @apply p-4 rounded-lg border;
+  background-color: hsl(var(--code-bg));
+  border-color: hsl(var(--code-border));
+}
+
+.structured-output pre {
+  @apply border-0 bg-transparent p-0 my-0;
+}
+
+.structured-output .field-name {
+  color: hsl(var(--code-keyword));
+  @apply font-medium;
+}
+
+.structured-output .field-value {
+  color: hsl(var(--code-string));
+}
+
+.structured-output .field-number {
+  color: hsl(var(--code-number));
 }

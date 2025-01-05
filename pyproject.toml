@@ -9,6 +9,7 @@ dependencies = [
     "fastapi",
     "uvicorn",
     "marvin@git+https://github.com/PrefectHQ/marvin-3.git",
+    "alembic>=1.14.0",
 ]
 
 
@@ -36,6 +37,10 @@ convention = "google"
 [tool.ruff.format]
 quote-style = "single"
 
+[tool.alembic]
+script_location = "backend/migrations"
+sqlalchemy.url = "sqlite:///app.db"
+file_template = "%%(year)d%%(month).2d%%(day).2d_%%(rev)s_%%(slug)s"
 
 [project.scripts]
 structured = "structured:main"

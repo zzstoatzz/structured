@@ -1,4 +1,4 @@
-.PHONY: install clean api ui
+.PHONY: install clean api ui migrate migration
 
 install:
 	uv venv && . .venv/bin/activate && uv sync
@@ -14,3 +14,13 @@ api:
 
 ui:
 	cd frontend && bun dev
+
+upgrade:
+	PYTHONPATH=. uv run alembic upgrade head
+
+
+downgrade:
+	PYTHONPATH=. uv run alembic downgrade
+
+autogenerate-revision:
+	PYTHONPATH=. uv run alembic revision --autogenerate -m "$(name)"

@@ -1,6 +1,6 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
-import { Eye, Trash2 } from 'lucide-react'
+import { Eye, Trash2, Loader2, X } from 'lucide-react'
 import { type Schemas } from '../types'
 import {
     AlertDialog,
@@ -13,14 +13,20 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Input } from "@/components/ui/input"
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 interface SchemaSelectorProps {
     schemas: Schemas
     selectedSchema: string
     onSchemaSelect: (value: string) => void
     onSchemaDelete: (schemaName: string) => void
-    onSchemaEdit: (schemaName: string, prompt: string) => void
+    onSchemaEdit: (schemaName: string, prompt: string) => Promise<void>
+}
+
+interface SchemaChange {
+    description: string
+    before: Record<string, any>
+    after: Record<string, any>
 }
 
 export function SchemaSelector({
@@ -33,6 +39,8 @@ export function SchemaSelector({
     const [schemaToDelete, setSchemaToDelete] = useState<string | null>(null)
     const [inspectSchema, setInspectSchema] = useState<string | null>(null)
     const [editPrompt, setEditPrompt] = useState('')
+    const [isEditing, setIsEditing] = useState(false)
+    const [schemaChange, setSchemaChange] = useState<SchemaChange | null>(null)
 
     const isCustomSchema = (schemaName: string) => {
         return !schemas[schemaName]?.is_builtin
@@ -58,12 +66,49 @@ export function SchemaSelector({
         setSchemaToDelete(null)
     }
 
-    const handleEdit = () => {
+    const handleEdit = async () => {
         if (inspectSchema && editPrompt.trim()) {
-            onSchemaEdit(inspectSchema, editPrompt)
-            setEditPrompt('')
+            setIsEditing(true)
+            try {
+                const beforeSchema = schemas[inspectSchema]
+                await onSchemaEdit(inspectSchema, editPrompt)
+                // Show change preview modal
+                setSchemaChange({
+                    description: editPrompt,
+                    before: beforeSchema,
+                    after: schemas[inspectSchema]
+                })
+                setEditPrompt('')
+                setInspectSchema(null)
+            } finally {
+                setIsEditing(false)
+            }
         }
     }
+
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && inspectSchema && editPrompt.trim() && !isEditing) {
+                e.preventDefault()
+                handleEdit()
+            }
+            // Dismiss change preview on Escape
+            if (e.key === 'Escape' && schemaChange) {
+                setSchemaChange(null)
+            }
+        }
+
+        window.addEventListener('keydown', handleKeyDown)
+        return () => window.removeEventListener('keydown', handleKeyDown)
+    }, [inspectSchema, editPrompt, isEditing, schemaChange])
+
+    // Auto-dismiss change preview after 5 seconds
+    useEffect(() => {
+        if (schemaChange) {
+            const timer = setTimeout(() => setSchemaChange(null), 5000)
+            return () => clearTimeout(timer)
+        }
+    }, [schemaChange])
 
     return (
         <>
@@ -168,12 +213,20 @@ export function SchemaSelector({
                                         value={editPrompt}
                                         onChange={(e) => setEditPrompt(e.target.value)}
                                         className="flex-1"
+                                        disabled={isEditing}
                                     />
                                     <Button
                                         onClick={handleEdit}
-                                        disabled={!editPrompt.trim()}
+                                        disabled={!editPrompt.trim() || isEditing}
                                     >
-                                        Update
+                                        {isEditing ? (
+                                            <div className="flex items-center gap-2">
+                                                <Loader2 className="h-4 w-4 animate-spin" />
+                                                <span>Updating...</span>
+                                            </div>
+                                        ) : (
+                                            <span>Update (⌘ + Enter)</span>
+                                        )}
                                     </Button>
                                 </div>
                                 <p className="text-xs text-muted-foreground mt-1">
@@ -185,6 +238,45 @@ export function SchemaSelector({
                     <AlertDialogFooter>
                         <AlertDialogCancel>Close</AlertDialogCancel>
                     </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            {/* Change Preview Modal */}
+            <AlertDialog
+                open={schemaChange !== null}
+                onOpenChange={() => setSchemaChange(null)}
+            >
+                <AlertDialogContent className="max-w-2xl">
+                    <AlertDialogHeader>
+                        <div className="flex items-center justify-between">
+                            <AlertDialogTitle>Schema Updated</AlertDialogTitle>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6"
+                                onClick={() => setSchemaChange(null)}
+                            >
+                                <X className="h-4 w-4" />
+                            </Button>
+                        </div>
+                        <AlertDialogDescription>
+                            {schemaChange?.description}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <div className="grid grid-cols-2 gap-4 py-4">
+                        <div>
+                            <h4 className="text-sm font-medium mb-2">Before</h4>
+                            <pre className="text-xs bg-muted rounded-md p-2 overflow-auto border">
+                                {schemaChange && JSON.stringify(schemaChange.before, null, 2)}
+                            </pre>
+                        </div>
+                        <div>
+                            <h4 className="text-sm font-medium mb-2">After</h4>
+                            <pre className="text-xs bg-muted rounded-md p-2 overflow-auto border">
+                                {schemaChange && JSON.stringify(schemaChange.after, null, 2)}
+                            </pre>
+                        </div>
+                    </div>
                 </AlertDialogContent>
             </AlertDialog>
         </>
