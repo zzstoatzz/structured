@@ -16,7 +16,7 @@
     --earth-800: 24 6% 16%;
     --earth-900: 24 10% 10%;
 
-    /* shadcn system colors */
+    /* shadcn system colors - light */
     --background: var(--earth-50);
     --foreground: var(--earth-900);
     --card: var(--earth-50);
@@ -38,6 +38,28 @@
     --ring: var(--earth-600);
     --radius: 0.5rem;
   }
+
+  .dark {
+    --background: var(--earth-900);
+    --foreground: var(--earth-50);
+    --card: var(--earth-800);
+    --card-foreground: var(--earth-50);
+    --popover: var(--earth-800);
+    --popover-foreground: var(--earth-50);
+    --primary: var(--earth-200);
+    --primary-foreground: var(--earth-900);
+    --secondary: var(--earth-700);
+    --secondary-foreground: var(--earth-200);
+    --muted: var(--earth-700);
+    --muted-foreground: var(--earth-300);
+    --accent: var(--earth-700);
+    --accent-foreground: var(--earth-200);
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: var(--earth-50);
+    --border: var(--earth-700);
+    --input: var(--earth-700);
+    --ring: var(--earth-300);
+  }
 }
 
 @layer base {
@@ -49,5 +71,9 @@
     @apply bg-background text-foreground;
     margin: 0;
     min-height: 100vh;
+    background: radial-gradient(circle at center,
+        hsl(var(--background)) 0%,
+        hsl(var(--background) / 0.95) 50%,
+        hsl(var(--background) / 0.85) 100%);
   }
 }
