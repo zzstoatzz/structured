@@ -72,34 +72,41 @@ export function StructuredOutputGenerator() {
 
     const handleSchemaDelete = async (schemaName: string) => {
         try {
-            console.log('Deleting schema:', schemaName)  // Debug log
             const response = await fetch(`http://localhost:8000/schemas/${schemaName}`, {
                 method: 'DELETE',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
             })
-
-            if (!response.ok) {
-                const errorText = await response.text()
-                throw new Error(`Failed to delete schema: ${errorText}`)
-            }
+            if (!response.ok) throw new Error('Failed to delete schema')
 
             // Refresh schemas after deletion
             const schemasResponse = await fetch('http://localhost:8000/schemas')
-            if (schemasResponse.ok) {
-                const schemas = await schemasResponse.json()
-                setSchemas(schemas)
-                // If the deleted schema was selected, clear the selection
-                if (selectedSchema === schemaName) {
-                    setSelectedSchema('')
-                    setInput('')
-                    setResponse('')
-                }
-            }
+            if (!schemasResponse.ok) throw new Error('Failed to fetch schemas')
+            const data = await schemasResponse.json()
+            setSchemas(data)
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to delete schema')
+            setError('Failed to delete schema')
             console.error('Error deleting schema:', err)
+        }
+    }
+
+    const handleSchemaEdit = async (schemaName: string, prompt: string) => {
+        try {
+            const response = await fetch(`http://localhost:8000/schemas/${schemaName}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ prompt }),
+            })
+            if (!response.ok) throw new Error('Failed to update schema')
+
+            // Refresh schemas after update
+            const schemasResponse = await fetch('http://localhost:8000/schemas')
+            if (!schemasResponse.ok) throw new Error('Failed to fetch schemas')
+            const data = await schemasResponse.json()
+            setSchemas(data)
+        } catch (err) {
+            setError('Failed to update schema')
+            console.error('Error updating schema:', err)
         }
     }
 
@@ -120,6 +127,7 @@ export function StructuredOutputGenerator() {
                                     selectedSchema={selectedSchema}
                                     onSchemaSelect={handleSchemaSelect}
                                     onSchemaDelete={handleSchemaDelete}
+                                    onSchemaEdit={handleSchemaEdit}
                                 />
                                 <InputSection
                                     input={input}

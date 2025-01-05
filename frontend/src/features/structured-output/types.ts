@@ -1,12 +1,16 @@
-export interface JsonSchema {
+export interface Schema {
     title: string
     description: string
-    type: string
-    properties: Record<string, any>
-    required?: string[]
-    prompt?: string
+    prompt: string
+    is_builtin: boolean
+    properties: {
+        [key: string]: {
+            type: string
+            description: string
+        }
+    }
 }
 
 export interface Schemas {
-    [key: string]: JsonSchema
+    [key: string]: Schema
 } 

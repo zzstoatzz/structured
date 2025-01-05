@@ -1,10 +1,26 @@
-"""Logging"""
-
 import logging
 from functools import lru_cache
 from typing import Optional
 
+from rich.console import Console
 from rich.logging import RichHandler
+
+
+def configure_logging() -> None:
+    """Configure rich logging with console handler."""
+    logger = logging.getLogger('marvin')
+
+    if not logger.handlers:  # only add handler if none exists
+        console = Console(force_terminal=True)
+        handler = RichHandler(
+            console=console,
+            show_time=True,
+            show_path=False,
+            markup=True,
+            rich_tracebacks=True,
+        )
+        logger.addHandler(handler)
+        logger.setLevel(logging.INFO)  # this will be overridden by settings
 
 
 @lru_cache
@@ -20,16 +36,19 @@ def get_logger(name: Optional[str] = None) -> logging.Logger:
     Example:
         Basic Usage of `get_logger`
         ```python
-        from backend.logging import get_logger
+        from marvin.utilities.logging import get_logger
 
         logger = get_logger("marvin.test")
         logger.info("This is a test") # Output: marvin.test: This is a test
 
-        debug_logger = get_logger("backend.debug")
+        debug_logger = get_logger("marvin.debug")
         debug_logger.debug_kv("TITLE", "log message", "green")
         ```
     """
-    parent_logger = logging.getLogger('backend')
+    # ensure logging is configured
+    configure_logging()
+
+    parent_logger = logging.getLogger('marvin')
 
     if name:
         # Append the name if given but allow explicit full names e.g. "marvin.test"
@@ -42,21 +61,3 @@ def get_logger(name: Optional[str] = None) -> logging.Logger:
         logger = parent_logger
 
     return logger
-
-
-def setup_logging(level: Optional[str] = None) -> None:
-    """Setup logging"""
-    logger = get_logger()
-
-    if level is not None:
-        logger.setLevel(level)
-    else:
-        # defer import to avoid circular dependency
-        from .settings import settings
-
-        logger.setLevel(settings.log_level)
-
-    # add rich handler if none exists
-    if not logger.handlers:
-        handler = RichHandler(rich_tracebacks=True, markup=True, show_time=True)
-        logger.addHandler(handler)
