@@ -11,7 +11,7 @@ export default function App() {
   }, [])
 
   return (
-    <div className="min-h-screen w-screen bg-background font-sans">
+    <div className="min-h-screen bg-background font-sans overflow-x-hidden">
       <ThemeToggle />
       <StructuredOutputGenerator />
     </div>

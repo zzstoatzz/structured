@@ -6,6 +6,8 @@ import { InputSection } from './components/InputSection'
 import { OutputDisplay } from './components/OutputDisplay'
 import { HistoryPanel } from './components/HistoryPanel'
 import { ErrorDisplay } from './components/ErrorDisplay'
+import { API_URL } from '@/config'
+import { cn } from '@/lib/utils'
 
 interface Props {
     className?: string
@@ -29,7 +31,7 @@ export function StructuredOutputGenerator({ className = '' }: Props) {
     useEffect(() => {
         const fetchSchemas = async () => {
             try {
-                const response = await fetch('http://localhost:8000/schemas')
+                const response = await fetch(`${API_URL}/schemas`)
                 if (!response.ok) {
                     const error = await response.json()
                     throw new Error(error.message)
@@ -67,7 +69,7 @@ export function StructuredOutputGenerator({ className = '' }: Props) {
                 return
             }
             try {
-                const response = await fetch(`http://localhost:8000/generations/${selectedSchema}`)
+                const response = await fetch(`${API_URL}/generations/${selectedSchema}`)
                 if (!response.ok) {
                     const error = await response.json()
                     throw new Error(error.message)
@@ -87,7 +89,7 @@ export function StructuredOutputGenerator({ className = '' }: Props) {
         setIsLoading(true)
         setError(null)
         try {
-            const response = await fetch(`http://localhost:8000/generate/${selectedSchema}`, {
+            const response = await fetch(`${API_URL}/generate/${selectedSchema}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -110,7 +112,7 @@ export function StructuredOutputGenerator({ className = '' }: Props) {
             setUpdateTrigger(Date.now())
 
             if (selectedSchema === 'NewSchema') {
-                const schemasResponse = await fetch('http://localhost:8000/schemas')
+                const schemasResponse = await fetch(`${API_URL}/schemas`)
                 if (!schemasResponse.ok) {
                     const error = await schemasResponse.json()
                     throw new Error(error.message)
@@ -148,7 +150,7 @@ export function StructuredOutputGenerator({ className = '' }: Props) {
 
     const handleSchemaDelete = async (schemaName: string) => {
         try {
-            const response = await fetch(`http://localhost:8000/schemas/${schemaName}`, {
+            const response = await fetch(`${API_URL}/schemas/${schemaName}`, {
                 method: 'DELETE',
             })
             if (!response.ok) {
@@ -156,7 +158,7 @@ export function StructuredOutputGenerator({ className = '' }: Props) {
                 throw new Error(error.detail || 'Failed to delete schema')
             }
 
-            const schemasResponse = await fetch('http://localhost:8000/schemas')
+            const schemasResponse = await fetch(`${API_URL}/schemas`)
             if (!schemasResponse.ok) throw new Error('Failed to fetch schemas')
             const data = await schemasResponse.json()
             setSchemas(data)
@@ -180,7 +182,7 @@ export function StructuredOutputGenerator({ className = '' }: Props) {
 
     const handleSchemaEdit = async (schemaName: string, prompt: string) => {
         try {
-            const response = await fetch(`http://localhost:8000/schemas/${schemaName}`, {
+            const response = await fetch(`${API_URL}/schemas/${schemaName}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -189,7 +191,7 @@ export function StructuredOutputGenerator({ className = '' }: Props) {
             })
             if (!response.ok) throw new Error('Failed to update schema')
 
-            const schemasResponse = await fetch('http://localhost:8000/schemas')
+            const schemasResponse = await fetch(`${API_URL}/schemas`)
             if (!schemasResponse.ok) throw new Error('Failed to fetch schemas')
             const data = await schemasResponse.json()
             setSchemas(data)
@@ -207,15 +209,15 @@ export function StructuredOutputGenerator({ className = '' }: Props) {
     }
 
     const mainContent = (
-        <Card className="bg-card">
-            <CardHeader className="border-b border-border">
-                <CardTitle>Structured Output Generator</CardTitle>
+        <Card className={cn("bg-card w-full", className)}>
+            <CardHeader className="border-b border-border px-4 py-3 md:px-6 md:py-4">
+                <CardTitle className="text-lg md:text-xl">Structured Output Generator</CardTitle>
             </CardHeader>
-            <CardContent className="flex flex-col space-y-8 p-8">
+            <CardContent className="flex flex-col space-y-4 md:space-y-6 p-4 md:p-6">
                 {error ? (
                     <ErrorDisplay error={error} onDismiss={() => setError(null)} />
                 ) : (
-                    <div className="flex flex-col space-y-8">
+                    <div className="flex flex-col space-y-4 md:space-y-6">
                         <div className="schema-selector">
                             <SchemaSelector
                                 schemas={schemas}
@@ -250,10 +252,10 @@ export function StructuredOutputGenerator({ className = '' }: Props) {
     )
 
     return (
-        <div className={`min-h-screen flex items-center justify-center p-12 ${className}`}>
-            <div className="w-[1400px] max-w-[95vw]">
-                <div className="grid grid-cols-[2fr,1fr] gap-8">
-                    <div className="min-w-0">
+        <div className={`min-h-screen flex items-start md:items-center justify-center p-4 md:p-12 ${className}`}>
+            <div className="w-full max-w-[95vw] md:max-w-[1400px]">
+                <div className="grid grid-cols-1 md:grid-cols-[minmax(0,2fr),minmax(0,1fr)] gap-4 md:gap-8">
+                    <div className="min-w-0 w-full">
                         {mainContent}
                     </div>
                     <div className="min-w-0 w-full">
