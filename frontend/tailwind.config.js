@@ -16,26 +16,16 @@ module.exports = {
 			},
 		},
 		extend: {
+			fontFamily: {
+				sans: ['"Inter Variable"', 'system-ui'],
+				mono: ['"JetBrains Mono Variable"', 'monospace'],
+			},
 			colors: {
 				border: "hsl(var(--border))",
 				input: "hsl(var(--input))",
 				ring: "hsl(var(--ring))",
 				background: "hsl(var(--background))",
 				foreground: "hsl(var(--foreground))",
-				'space-blue': {
-					DEFAULT: '#0A1929',
-					50: '#E6F0F9',
-					100: '#CCE0F3',
-					200: '#99C2E6',
-					300: '#66A3DA',
-					400: '#3385CD',
-					500: '#0066C1',
-					600: '#00529A',
-					700: '#003D74',
-					800: '#00294D',
-					900: '#0A1929',
-					950: '#050D15',
-				},
 				primary: {
 					DEFAULT: "hsl(var(--primary))",
 					foreground: "hsl(var(--primary-foreground))",

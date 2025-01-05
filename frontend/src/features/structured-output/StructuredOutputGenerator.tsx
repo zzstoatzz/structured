@@ -5,6 +5,7 @@ import { SchemaSelector } from './components/SchemaSelector'
 import { InputSection } from './components/InputSection'
 import { OutputDisplay } from './components/OutputDisplay'
 import { HistoryPanel } from './components/HistoryPanel'
+import { ErrorDisplay } from './components/ErrorDisplay'
 
 interface Props {
     className?: string
@@ -16,7 +17,11 @@ export function StructuredOutputGenerator({ className = '' }: Props) {
     const [isLoading, setIsLoading] = useState(false)
     const [selectedSchema, setSelectedSchema] = useState<string>('')
     const [schemas, setSchemas] = useState<Schemas>({})
-    const [error, setError] = useState<string>('')
+    const [error, setError] = useState<{
+        type: 'validation_error' | 'not_found' | 'generation_error' | 'database_error' | 'schema_error'
+        message: string
+        details?: Record<string, any>
+    } | null>(null)
     const [hasGenerations, setHasGenerations] = useState(false)
     const [lastGenerationTime, setLastGenerationTime] = useState<number>(0)
     const [updateTrigger, setUpdateTrigger] = useState<number>(0)
@@ -25,16 +30,34 @@ export function StructuredOutputGenerator({ className = '' }: Props) {
         const fetchSchemas = async () => {
             try {
                 const response = await fetch('http://localhost:8000/schemas')
-                if (!response.ok) throw new Error('Failed to fetch schemas')
+                if (!response.ok) {
+                    const error = await response.json()
+                    throw new Error(error.message)
+                }
                 const data = await response.json()
                 setSchemas(data)
             } catch (err) {
-                setError('Failed to load schemas. Is the backend running?')
+                setError({
+                    type: 'schema_error',
+                    message: 'Failed to load schemas. Is the backend running?',
+                    details: err instanceof Error ? { error: err.message } : undefined
+                })
                 console.error('Error fetching schemas:', err)
             }
         }
 
         fetchSchemas()
+    }, [])
+
+    useEffect(() => {
+        const handleSchemaSelect = (e: CustomEvent<string>) => {
+            setSelectedSchema(e.detail)
+            setInput('')
+            setResponse('')
+        }
+
+        window.addEventListener('select-schema', handleSchemaSelect as EventListener)
+        return () => window.removeEventListener('select-schema', handleSchemaSelect as EventListener)
     }, [])
 
     useEffect(() => {
@@ -45,7 +68,10 @@ export function StructuredOutputGenerator({ className = '' }: Props) {
             }
             try {
                 const response = await fetch(`http://localhost:8000/generations/${selectedSchema}`)
-                if (!response.ok) throw new Error('Failed to fetch generations')
+                if (!response.ok) {
+                    const error = await response.json()
+                    throw new Error(error.message)
+                }
                 const data = await response.json()
                 setHasGenerations(data.length > 0)
             } catch (err) {
@@ -59,7 +85,7 @@ export function StructuredOutputGenerator({ className = '' }: Props) {
 
     const handleSubmit = async () => {
         setIsLoading(true)
-        setError('')
+        setError(null)
         try {
             const response = await fetch(`http://localhost:8000/generate/${selectedSchema}`, {
                 method: 'POST',
@@ -69,23 +95,44 @@ export function StructuredOutputGenerator({ className = '' }: Props) {
                 body: JSON.stringify({ prompt: input }),
             })
 
+            const data = await response.json()
+
             if (!response.ok) {
-                throw new Error(`Error: ${response.statusText}`)
+                throw {
+                    type: data.type || 'generation_error',
+                    message: data.message || 'Failed to generate output',
+                    details: data.details
+                }
             }
 
-            const data = await response.json()
             setResponse(JSON.stringify(data, null, 2))
             setLastGenerationTime(Date.now())
+            setUpdateTrigger(Date.now())
 
             if (selectedSchema === 'NewSchema') {
                 const schemasResponse = await fetch('http://localhost:8000/schemas')
-                if (schemasResponse.ok) {
-                    const schemas = await schemasResponse.json()
-                    setSchemas(schemas)
+                if (!schemasResponse.ok) {
+                    const error = await schemasResponse.json()
+                    throw new Error(error.message)
                 }
+                const schemas = await schemasResponse.json()
+                setSchemas(schemas)
+                setUpdateTrigger(Date.now())
             }
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to generate output')
+        } catch (err: unknown) {
+            if (typeof err === 'object' && err !== null && 'type' in err) {
+                setError(err as {
+                    type: 'validation_error' | 'not_found' | 'generation_error' | 'database_error' | 'schema_error'
+                    message: string
+                    details?: Record<string, any>
+                })
+            } else {
+                setError({
+                    type: 'generation_error',
+                    message: err instanceof Error ? err.message : 'Failed to generate output',
+                    details: err instanceof Error ? { error: err.message } : undefined
+                })
+            }
             console.error('Error generating output:', err)
         } finally {
             setIsLoading(false)
@@ -96,6 +143,7 @@ export function StructuredOutputGenerator({ className = '' }: Props) {
         setSelectedSchema(value)
         setInput('')
         setResponse('')
+        setUpdateTrigger(Date.now())
     }
 
     const handleSchemaDelete = async (schemaName: string) => {
@@ -103,14 +151,29 @@ export function StructuredOutputGenerator({ className = '' }: Props) {
             const response = await fetch(`http://localhost:8000/schemas/${schemaName}`, {
                 method: 'DELETE',
             })
-            if (!response.ok) throw new Error('Failed to delete schema')
+            if (!response.ok) {
+                const error = await response.json()
+                throw new Error(error.detail || 'Failed to delete schema')
+            }
 
             const schemasResponse = await fetch('http://localhost:8000/schemas')
             if (!schemasResponse.ok) throw new Error('Failed to fetch schemas')
             const data = await schemasResponse.json()
             setSchemas(data)
+
+            // Clear selected schema if it was the one deleted
+            if (selectedSchema === schemaName) {
+                setSelectedSchema('')
+                setInput('')
+                setResponse('')
+            }
+            setUpdateTrigger(Date.now())
         } catch (err) {
-            setError('Failed to delete schema')
+            setError({
+                type: 'schema_error',
+                message: 'Failed to delete schema',
+                details: err instanceof Error ? { error: err.message } : undefined
+            })
             console.error('Error deleting schema:', err)
         }
     }
@@ -133,7 +196,11 @@ export function StructuredOutputGenerator({ className = '' }: Props) {
 
             setUpdateTrigger(Date.now())
         } catch (err) {
-            setError('Failed to update schema')
+            setError({
+                type: 'schema_error',
+                message: 'Failed to update schema',
+                details: err instanceof Error ? { error: err.message } : undefined
+            })
             console.error('Error updating schema:', err)
             throw err
         }
@@ -146,9 +213,7 @@ export function StructuredOutputGenerator({ className = '' }: Props) {
             </CardHeader>
             <CardContent className="flex flex-col space-y-8 p-8">
                 {error ? (
-                    <div className="text-sm bg-destructive/10 border border-destructive/20 rounded-lg px-4 py-3 text-destructive" role="alert">
-                        {error}
-                    </div>
+                    <ErrorDisplay error={error} onDismiss={() => setError(null)} />
                 ) : (
                     <div className="flex flex-col space-y-8">
                         <div className="schema-selector">
@@ -187,11 +252,11 @@ export function StructuredOutputGenerator({ className = '' }: Props) {
     return (
         <div className={`min-h-screen flex items-center justify-center p-12 ${className}`}>
             <div className="w-[1400px] max-w-[95vw]">
-                <div className="grid grid-cols-[minmax(0,_2fr),minmax(0,_1fr)] gap-8">
-                    <div>
+                <div className="grid grid-cols-[2fr,1fr] gap-8">
+                    <div className="min-w-0">
                         {mainContent}
                     </div>
-                    <div className="min-w-0">
+                    <div className="min-w-0 w-full">
                         <HistoryPanel
                             schemaName={selectedSchema || null}
                             updateTrigger={updateTrigger}

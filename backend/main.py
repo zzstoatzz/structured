@@ -1,19 +1,37 @@
 """Main backend module"""
 
-from typing import Any
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
+from typing import Any, Literal
 
 import marvin
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, create_model
 from sqlalchemy.orm import Session
 
 from . import VERSION
-from .database import Generation, Schema, get_session
+from .database import Generation, Schema, get_session, init_db
 from .loggers import get_logger
 from .schemas import SchemaDefinition, SchemaService, schema_service
 
 logger = get_logger(__name__)
+
+
+class ErrorResponse(BaseModel):
+    """Error response"""
+
+    type: Literal[
+        'validation_error',
+        'not_found',
+        'generation_error',
+        'database_error',
+        'schema_error',
+    ]
+    message: str
+    details: dict[str, Any] | None = None
 
 
 class PromptRequest(BaseModel):
@@ -36,10 +54,24 @@ class GenerationResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    """Lifespan context manager for FastAPI app"""
+    try:
+        # Initialize database and builtin schemas
+        init_db()
+        schema_service._init_builtins()  # type: ignore
+        logger.info('Database and builtin schemas initialized')
+    except Exception as e:
+        logger.error(f'Failed to initialize database: {e}')
+    yield
+
+
 app = FastAPI(
     title='structured outputs',
     description='Generate structured outputs from natural language prompts',
     version=VERSION,
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -49,6 +81,37 @@ app.add_middleware(
     allow_methods=['*'],
     allow_headers=['*'],
 )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(
+    request: Request, exc: RequestValidationError
+) -> JSONResponse:
+    """Validation exception handler"""
+    return JSONResponse(
+        status_code=422,
+        content=ErrorResponse(
+            type='validation_error',
+            message='Invalid request data',
+            details={'errors': exc.errors()},
+        ).model_dump(),
+    )
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(
+    request: Request, exc: HTTPException
+) -> JSONResponse:
+    """HTTP exception handler"""
+    error_type = 'not_found' if exc.status_code == 404 else 'generation_error'
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=ErrorResponse(
+            type=error_type,
+            message=str(exc.detail),
+            details=getattr(exc, 'details', None),
+        ).model_dump(),
+    )
 
 
 def get_schema_service() -> SchemaService:
@@ -88,9 +151,10 @@ def create_pydantic_model(schema: SchemaDefinition) -> type[BaseModel]:
 @app.get('/schemas')
 def get_schemas(
     service: SchemaService = Depends(get_schema_service),
+    db: Session = Depends(get_db),
 ) -> dict[str, dict[str, Any]]:
     """Get all schemas"""
-    schemas = service.get_all()
+    schemas = service.get_all(db)
     return {
         name: {
             'title': schema.name,
@@ -117,56 +181,76 @@ async def generate_structured_output(
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     """Generate structured output from a prompt"""
-    if not (schema := service.get(schema_name)):
-        raise HTTPException(
-            status_code=404, detail=f'Schema {schema_name} not found'
-        )
-
     try:
-        if schema_name == 'NewSchema':
-            result = await marvin.cast_async(
-                request.prompt,
-                target=SchemaDefinition,
-                instructions=(
-                    'the prompt should be short and give a user an understanding of what text they need to provide. '
-                    'note that the user does not need to provide all fields, they can give a fuzzy description. '
-                    'for fields, return a list of SchemaField objects with name, type, and description. '
-                    'type must be one of: string, integer, boolean, number, list, dict. '
-                    'ensure each field has a clear, concise description.'
-                ),
-            )
-            service.create(result)
-            output = result.model_dump()
-        else:
-            model = create_pydantic_model(schema)
-            result = await marvin.cast_async(request.prompt, target=model)
-            output = result.model_dump()
+        # Ensure database is initialized
+        init_db()
 
-        # Store the generation in the database - same logic for all schemas
-        db_schema = (
-            db.query(Schema)
-            .filter(Schema.name == schema_name, Schema.is_latest == True)
-            .first()
-        )
-        if not db_schema:
+        if not (schema := service.get(schema_name, db)):
             raise HTTPException(
                 status_code=404,
-                detail=f'Schema {schema_name} not found in database',
+                detail=f'Schema {schema_name} not found',
+                headers={'X-Error-Type': 'not_found'},
             )
 
-        generation = Generation(
-            schema_id=db_schema.id,
-            prompt=request.prompt,
-            output=output,
-        )
-        db.add(generation)
-        db.commit()
+        try:
+            if schema_name == 'NewSchema':
+                result = await marvin.cast_async(
+                    request.prompt,
+                    target=SchemaDefinition,
+                    instructions=(
+                        'the prompt should be short and give a user an understanding of what text they need to provide. '
+                        'note that the user does not need to provide all fields, they can give a fuzzy description. '
+                        'for fields, return a list of SchemaField objects with name, type, and description. '
+                        'type must be one of: string, integer, boolean, number, list, dict. '
+                        'ensure each field has a clear, concise description.'
+                    ),
+                )
+                service.create(result, db)
+                output = result.model_dump()
+            else:
+                model = create_pydantic_model(schema)
+                result = await marvin.cast_async(request.prompt, target=model)
+                output = result.model_dump()
 
-        return output
+            try:
+                # Store the generation in the database
+                db_schema = (
+                    db.query(Schema)
+                    .filter(Schema.name == schema_name, Schema.is_latest)
+                    .first()
+                )
+                if not db_schema:
+                    logger.error(
+                        f'Schema {schema_name} not found in database after generation'
+                    )
+                    return output  # Return output even if we can't store it
+
+                generation = Generation(
+                    schema_id=db_schema.id,
+                    prompt=request.prompt,
+                    output=output,
+                )
+                db.add(generation)
+                db.commit()
+            except Exception as e:
+                logger.error(f'Failed to store generation in database: {e}')
+                db.rollback()
+                return output  # Return output even if we can't store it
+
+            return output
+        except Exception as e:
+            logger.error(f'Generation failed: {e}')
+            raise HTTPException(
+                status_code=500,
+                detail='Failed to generate structured output',
+                headers={'X-Error-Type': 'generation_error'},
+            )
     except Exception as e:
-        logger.error(f'Generation failed: {e}')
+        logger.error(f'Database error in generate endpoint: {e}')
         raise HTTPException(
-            status_code=500, detail=f'Failed to generate output: {str(e)}'
+            status_code=500,
+            detail='Database error occurred',
+            headers={'X-Error-Type': 'database_error'},
         )
 
 
@@ -177,37 +261,46 @@ def get_generations(
     db: Session = Depends(get_db),
 ) -> list[GenerationResponse]:
     """Get generation history for a schema"""
-    schema = (
-        db.query(Schema)
-        .filter(Schema.name == schema_name, Schema.is_latest == True)
-        .first()
-    )
-    if not schema:
-        raise HTTPException(
-            status_code=404, detail=f'Schema {schema_name} not found'
+    try:
+        # First check if schema exists
+        schema = (
+            db.query(Schema)
+            .filter(Schema.name == schema_name, Schema.is_latest)
+            .first()
+        )
+        if not schema:
+            raise HTTPException(
+                status_code=404, detail=f'Schema {schema_name} not found'
+            )
+
+        # Get all generations for this schema name, including their schema versions
+        query = (
+            db.query(Generation)
+            .join(Schema)
+            .filter(Schema.name == schema_name)
+            .order_by(Generation.id.desc())
         )
 
-    query = db.query(Generation).join(Schema).filter(Schema.name == schema_name)
+        if favorites_only:
+            query = query.filter(Generation.is_favorite)
 
-    if favorites_only:
-        query = query.filter(Generation.is_favorite == True)
+        generations = query.all()
 
-    generations = query.order_by(
-        Generation.id.desc()
-    ).all()  # Use ID for stable ordering
-
-    return [
-        GenerationResponse(
-            id=gen.id,
-            schema_name=schema_name,
-            schema_version=gen.schema.version,
-            prompt=gen.prompt,
-            output=gen.output,
-            created_at=gen.created_at.isoformat(),
-            is_favorite=gen.is_favorite,
-        )
-        for gen in generations
-    ]
+        return [
+            GenerationResponse(
+                id=gen.id,
+                schema_name=schema_name,
+                schema_version=gen.schema.version,
+                prompt=gen.prompt,
+                output=gen.output,
+                created_at=gen.created_at.isoformat(),
+                is_favorite=gen.is_favorite,
+            )
+            for gen in generations
+        ]
+    except Exception as e:
+        logger.error(f'Error getting generations: {e}')
+        return []
 
 
 @app.put('/generations/{generation_id}/favorite')
@@ -241,11 +334,13 @@ def toggle_favorite(
 
 @app.delete('/schemas/{schema_name}')
 def delete_schema(
-    schema_name: str, service: SchemaService = Depends(get_schema_service)
+    schema_name: str,
+    service: SchemaService = Depends(get_schema_service),
+    db: Session = Depends(get_db),
 ) -> dict[str, str]:
     """Delete a schema"""
     try:
-        service.delete(schema_name)
+        service.delete(schema_name, db)
         return {'message': f'Schema {schema_name} deleted successfully'}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -256,9 +351,10 @@ async def update_schema(
     schema_name: str,
     request: PromptRequest,
     service: SchemaService = Depends(get_schema_service),
+    db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     """Update a schema using AI to transform it"""
-    if not (old_schema := service.get(schema_name)):
+    if not (old_schema := service.get(schema_name, db)):
         raise HTTPException(
             status_code=404, detail=f'Schema {schema_name} not found'
         )
@@ -276,7 +372,7 @@ async def update_schema(
         updated_schema.name = schema_name  # ensure name stays the same
 
         # Update schema and create new version
-        service.create(updated_schema)
+        service.create(updated_schema, db)
         return updated_schema.model_dump()
     except Exception as e:
         logger.error(f'Schema update failed: {e}')
@@ -315,9 +411,10 @@ def delete_generation(
 def get_schema(
     schema_name: str,
     service: SchemaService = Depends(get_schema_service),
+    db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     """Get a specific schema by name"""
-    if not (schema := service.get(schema_name)):
+    if not (schema := service.get(schema_name, db)):
         raise HTTPException(
             status_code=404, detail=f'Schema {schema_name} not found'
         )
@@ -355,3 +452,42 @@ def get_schema_versions(
         }
         for v in versions
     ]
+
+
+@app.get('/generations')
+def get_all_generations(
+    db: Session = Depends(get_db),
+) -> dict[str, list[GenerationResponse]]:
+    """Get all generations grouped by schema"""
+    try:
+        # Get all generations with their schemas
+        generations = (
+            db.query(Generation)
+            .join(Schema)
+            .order_by(Generation.id.desc())
+            .all()
+        )
+
+        # Group generations by schema name
+        grouped_generations: dict[str, list[GenerationResponse]] = {}
+        for gen in generations:
+            schema_name = gen.schema.name
+            if schema_name not in grouped_generations:
+                grouped_generations[schema_name] = []
+
+            grouped_generations[schema_name].append(
+                GenerationResponse(
+                    id=gen.id,
+                    schema_name=schema_name,
+                    schema_version=gen.schema.version,
+                    prompt=gen.prompt,
+                    output=gen.output,
+                    created_at=gen.created_at.isoformat(),
+                    is_favorite=gen.is_favorite,
+                )
+            )
+
+        return grouped_generations
+    except Exception as e:
+        logger.error(f'Error getting all generations: {e}')
+        return {}

@@ -2,6 +2,7 @@
 
 from pydantic import BaseModel, Field
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from .database import Schema, get_session, init_db
 from .loggers import get_logger
@@ -131,59 +132,68 @@ class SchemaService:
 
     def __init__(self):
         """Initialize service"""
-        init_db()
-        self.session = get_session()
         self._init_builtins()
 
     def _init_builtins(self):
         """Initialize built-in schemas"""
-        for name, schema in BUILTIN_SCHEMAS.items():
-            # check if schema already exists
-            stored = (
-                self.session.query(Schema)
-                .filter(Schema.name == name, Schema.is_latest == True)
-                .first()
-            )
-            if not stored:
-                stored = Schema(
-                    name=name,
+        session = get_session()
+        try:
+            for name, schema in BUILTIN_SCHEMAS.items():
+                # check if schema already exists
+                stored = (
+                    session.query(Schema)
+                    .filter(Schema.name == name, Schema.is_latest)
+                    .first()
+                )
+                if not stored:
+                    stored = Schema(
+                        name=name,
+                        description=schema.description,
+                        prompt=schema.prompt,
+                        fields=[field.model_dump() for field in schema.fields],
+                        is_builtin=True,
+                        version=1,
+                        is_latest=True,
+                    )
+                    try:
+                        session.add(stored)
+                        session.commit()
+                    except Exception as e:
+                        logger.error(f'Failed to initialize {name}: {e}')
+                        session.rollback()
+        except Exception as e:
+            logger.error(f'Failed to initialize builtins: {e}')
+        finally:
+            session.close()
+
+    def get_all(self, session: Session) -> dict[str, SchemaDefinition]:
+        """Get all latest schema versions"""
+        try:
+            stmt = select(Schema).where(Schema.is_latest)
+            results = session.execute(stmt).scalars().all()
+            return {
+                schema.name: SchemaDefinition(
+                    name=schema.name,
                     description=schema.description,
                     prompt=schema.prompt,
-                    fields=[field.model_dump() for field in schema.fields],
-                    is_builtin=True,
-                    version=1,
-                    is_latest=True,
+                    fields=[SchemaField(**field) for field in schema.fields],
+                    is_builtin=schema.is_builtin,
+                    version=schema.version,
                 )
-                try:
-                    self.session.add(stored)
-                    self.session.commit()
-                except Exception as e:
-                    logger.error(f'Failed to initialize {name}: {e}')
-                    self.session.rollback()
+                for schema in results
+            }
+        except Exception as e:
+            logger.error(f'Failed to get all schemas: {e}')
+            return {}
 
-    def get_all(self) -> dict[str, SchemaDefinition]:
-        """Get all latest schema versions"""
-        stmt = select(Schema).where(Schema.is_latest == True)
-        results = self.session.execute(stmt).scalars().all()
-        return {
-            schema.name: SchemaDefinition(
-                name=schema.name,
-                description=schema.description,
-                prompt=schema.prompt,
-                fields=[SchemaField(**field) for field in schema.fields],
-                is_builtin=schema.is_builtin,
-                version=schema.version,
-            )
-            for schema in results
-        }
-
-    def get(self, name: str) -> SchemaDefinition | None:
+    def get(self, name: str, session: Session) -> SchemaDefinition | None:
         """Get latest version of a schema by name"""
         try:
-            stmt = select(Schema).where(
-                Schema.name == name, Schema.is_latest == True
-            )
-            result = self.session.execute(stmt).scalar_one_or_none()
+            # Ensure tables exist
+            init_db()
+
+            stmt = select(Schema).where(Schema.name == name, Schema.is_latest)
+            result = session.execute(stmt).scalar_one_or_none()
             if result:
                 return SchemaDefinition(
                     name=result.name,
@@ -198,13 +208,16 @@ class SchemaService:
             logger.error(f'Failed to get schema {name}: {e}')
             return None
 
-    def create(self, schema: SchemaDefinition) -> None:
+    def create(self, schema: SchemaDefinition, session: Session) -> None:
         """Create or update a schema"""
         try:
+            # Ensure tables exist
+            init_db()
+
             # get existing latest version
-            existing = self.session.execute(
+            existing = session.execute(
                 select(Schema).where(
-                    Schema.name == schema.name, Schema.is_latest == True
+                    Schema.name == schema.name, Schema.is_latest
                 )
             ).scalar_one_or_none()
 
@@ -226,7 +239,7 @@ class SchemaService:
                     parent_id=existing.id,
                     is_latest=True,
                 )
-                self.session.add(new_version)
+                session.add(new_version)
             else:
                 # Create new schema
                 new_schema = Schema(
@@ -238,21 +251,22 @@ class SchemaService:
                     version=1,
                     is_latest=True,
                 )
-                self.session.add(new_schema)
+                session.add(new_schema)
 
-            self.session.commit()
+            session.commit()
         except Exception as e:
             logger.error(f'Failed to create/update schema {schema.name}: {e}')
-            self.session.rollback()
+            session.rollback()
             raise
 
-    def delete(self, name: str) -> None:
+    def delete(self, name: str, session: Session) -> None:
         """Delete all versions of a schema"""
         try:
-            schema = self.session.execute(
-                select(Schema).where(
-                    Schema.name == name, Schema.is_latest == True
-                )
+            # Ensure tables exist
+            init_db()
+
+            schema = session.execute(
+                select(Schema).where(Schema.name == name, Schema.is_latest)
             ).scalar_one_or_none()
 
             if schema:
@@ -260,13 +274,19 @@ class SchemaService:
                     raise ValueError(f'Cannot delete built-in schema {name}')
 
                 # Delete all versions of this schema
-                self.session.query(Schema).filter(Schema.name == name).delete()
-                self.session.commit()
+                schemas_to_delete = (
+                    session.query(Schema).filter(Schema.name == name).all()
+                )
+                for schema in schemas_to_delete:
+                    session.delete(
+                        schema
+                    )  # This will cascade delete generations due to relationship config
+                session.commit()
             else:
                 raise ValueError(f'Schema {name} not found')
         except Exception as e:
             logger.error(f'Failed to delete schema {name}: {e}')
-            self.session.rollback()
+            session.rollback()
             raise
 
 

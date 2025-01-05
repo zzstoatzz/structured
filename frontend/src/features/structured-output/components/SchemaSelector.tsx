@@ -204,7 +204,7 @@ export function SchemaSelector({
                                 ))}
                             </div>
                         </div>
-                        {inspectSchema && !schemas[inspectSchema]?.is_builtin && (
+                        {inspectSchema && !schemas[inspectSchema]?.is_builtin ? (
                             <div className="pt-2">
                                 <h4 className="text-sm font-medium mb-2">Edit Schema</h4>
                                 <div className="flex gap-2">
@@ -232,6 +232,14 @@ export function SchemaSelector({
                                 <p className="text-xs text-muted-foreground mt-1">
                                     Example: "Add a genre field" or "Remove name and age fields"
                                 </p>
+                            </div>
+                        ) : inspectSchema && schemas[inspectSchema]?.is_builtin && (
+                            <div className="pt-2">
+                                <div className="rounded-md bg-muted p-3">
+                                    <p className="text-sm text-muted-foreground">
+                                        This is a built-in schema and cannot be edited. You can create a new custom schema based on this one by selecting "New Schema" and describing what you want.
+                                    </p>
+                                </div>
                             </div>
                         )}
                     </div>

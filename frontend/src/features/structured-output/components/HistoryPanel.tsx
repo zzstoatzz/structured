@@ -9,7 +9,7 @@ interface HistoryPanelProps {
 
 export function HistoryPanel({ schemaName, updateTrigger, className = '' }: HistoryPanelProps) {
     return (
-        <div className="space-y-4">
+        <div className="space-y-4 w-full overflow-hidden">
             <SchemaVersionHistory
                 schemaName={schemaName}
                 updateTrigger={updateTrigger}

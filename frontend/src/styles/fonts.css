@@ -1,0 +1,20 @@
+/* Import fonts */
+@import '@fontsource-variable/inter';
+@import '@fontsource-variable/fira-code';
+
+/* Set default fonts */
+:root {
+    --font-sans: 'Inter Variable';
+    --font-mono: 'Fira Code Variable';
+}
+
+/* Apply fonts */
+body {
+    font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+}
+
+code,
+pre,
+.font-mono {
+    font-family: var(--font-mono), monospace;
+}
