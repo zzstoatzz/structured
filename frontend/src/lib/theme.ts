@@ -1,22 +1,14 @@
-export type theme = 'dark' | 'light' | 'system'
+export type theme = 'dark' | 'light'
 
 export function getSystemTheme(): theme {
-    if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-        return 'dark'
-    }
-    return 'light'
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
 }
 
 export function setTheme(theme: theme) {
     const root = window.document.documentElement
     root.classList.remove('dark')
 
-    if (theme === 'system') {
-        const systemTheme = getSystemTheme()
-        if (systemTheme === 'dark') {
-            root.classList.add('dark')
-        }
-    } else if (theme === 'dark') {
+    if (theme === 'dark') {
         root.classList.add('dark')
     }
 
@@ -24,4 +16,4 @@ export function setTheme(theme: theme) {
 }
 
 // initialize theme
-setTheme('system') 
+setTheme(getSystemTheme()) 

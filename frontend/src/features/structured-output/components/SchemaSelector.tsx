@@ -19,11 +19,17 @@ interface SchemaSelectorProps {
     schemas: Schemas
     selectedSchema: string
     onSchemaSelect: (value: string) => void
-    onSchemaDelete?: (schemaName: string) => void
-    onSchemaEdit?: (schemaName: string, prompt: string) => void
+    onSchemaDelete: (schemaName: string) => void
+    onSchemaEdit: (schemaName: string, prompt: string) => void
 }
 
-export function SchemaSelector({ schemas, selectedSchema, onSchemaSelect, onSchemaDelete, onSchemaEdit }: SchemaSelectorProps) {
+export function SchemaSelector({
+    schemas,
+    selectedSchema,
+    onSchemaSelect,
+    onSchemaDelete,
+    onSchemaEdit,
+}: SchemaSelectorProps) {
     const [schemaToDelete, setSchemaToDelete] = useState<string | null>(null)
     const [inspectSchema, setInspectSchema] = useState<string | null>(null)
     const [editPrompt, setEditPrompt] = useState('')
@@ -42,18 +48,18 @@ export function SchemaSelector({ schemas, selectedSchema, onSchemaSelect, onSche
         e.preventDefault()
         e.stopPropagation()
         setInspectSchema(schemaName)
-        setEditPrompt('')  // Reset edit prompt when opening inspect
+        setEditPrompt('')
     }
 
     const confirmDelete = () => {
-        if (schemaToDelete && onSchemaDelete) {
+        if (schemaToDelete) {
             onSchemaDelete(schemaToDelete)
         }
         setSchemaToDelete(null)
     }
 
     const handleEdit = () => {
-        if (inspectSchema && onSchemaEdit && editPrompt.trim()) {
+        if (inspectSchema && editPrompt.trim()) {
             onSchemaEdit(inspectSchema, editPrompt)
             setEditPrompt('')
         }
@@ -61,40 +67,40 @@ export function SchemaSelector({ schemas, selectedSchema, onSchemaSelect, onSche
 
     return (
         <>
-            <Select onValueChange={onSchemaSelect} value={selectedSchema}>
-                <SelectTrigger className="w-full bg-earth-50 border-earth-200">
-                    <SelectValue placeholder="Select output format..." />
+            <Select value={selectedSchema} onValueChange={onSchemaSelect}>
+                <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select an output format..." />
                 </SelectTrigger>
                 <SelectContent>
                     {Object.entries(schemas).map(([name, schema]) => (
-                        <div key={name} className="relative">
+                        <div key={name} className="relative group">
                             <SelectItem
                                 value={name}
-                                className={`py-2 pr-16 ${schema.is_builtin ? 'bg-earth-50' : ''}`}
+                                className="py-2 pr-16"
                             >
                                 <div className="flex flex-col">
                                     <span className="font-medium">{schema.title}</span>
-                                    <span className="text-xs text-earth-500/80">
+                                    <span className="text-xs text-muted-foreground">
                                         {schema.description}
                                     </span>
                                 </div>
                             </SelectItem>
-                            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1">
+                            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <Button
                                     type="button"
                                     variant="ghost"
                                     size="icon"
-                                    className="h-6 w-6 hover:bg-blue-100 hover:text-blue-600 z-50"
+                                    className="h-6 w-6"
                                     onClick={(e) => handleInspect(e, name)}
                                 >
                                     <Eye className="h-4 w-4" />
                                 </Button>
-                                {isCustomSchema(name) && onSchemaDelete && (
+                                {isCustomSchema(name) && (
                                     <Button
                                         type="button"
                                         variant="ghost"
                                         size="icon"
-                                        className="h-6 w-6 hover:bg-red-100 hover:text-red-600 z-50"
+                                        className="h-6 w-6"
                                         onClick={(e) => handleDelete(e, name)}
                                     >
                                         <Trash2 className="h-4 w-4" />
@@ -118,7 +124,7 @@ export function SchemaSelector({ schemas, selectedSchema, onSchemaSelect, onSche
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
                         <AlertDialogAction
                             onClick={confirmDelete}
-                            className="bg-red-600 hover:bg-red-700 text-white"
+                            className="bg-red-500 hover:bg-red-600 text-white"
                         >
                             Delete
                         </AlertDialogAction>
@@ -129,7 +135,9 @@ export function SchemaSelector({ schemas, selectedSchema, onSchemaSelect, onSche
             <AlertDialog open={inspectSchema !== null} onOpenChange={() => setInspectSchema(null)}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>{inspectSchema && schemas[inspectSchema]?.title}</AlertDialogTitle>
+                        <AlertDialogTitle>
+                            {inspectSchema && schemas[inspectSchema]?.title}
+                        </AlertDialogTitle>
                         <AlertDialogDescription>
                             {inspectSchema && schemas[inspectSchema]?.description}
                         </AlertDialogDescription>
@@ -137,7 +145,7 @@ export function SchemaSelector({ schemas, selectedSchema, onSchemaSelect, onSche
                     <div className="space-y-4 py-4">
                         <div>
                             <h4 className="text-sm font-medium mb-2">Prompt Template</h4>
-                            <p className="text-sm text-earth-500">{inspectSchema && schemas[inspectSchema]?.prompt}</p>
+                            <p className="text-sm text-muted-foreground">{inspectSchema && schemas[inspectSchema]?.prompt}</p>
                         </div>
                         <div>
                             <h4 className="text-sm font-medium mb-2">Fields</h4>
@@ -145,8 +153,8 @@ export function SchemaSelector({ schemas, selectedSchema, onSchemaSelect, onSche
                                 {inspectSchema && Object.entries(schemas[inspectSchema]?.properties || {}).map(([fieldName, field]) => (
                                     <div key={fieldName} className="text-sm">
                                         <span className="font-medium">{fieldName}</span>
-                                        <span className="text-earth-500"> ({field.type})</span>
-                                        <p className="text-earth-500 text-xs mt-0.5">{field.description}</p>
+                                        <span className="text-muted-foreground"> ({field.type})</span>
+                                        <p className="text-xs text-muted-foreground mt-0.5">{field.description}</p>
                                     </div>
                                 ))}
                             </div>
@@ -164,13 +172,12 @@ export function SchemaSelector({ schemas, selectedSchema, onSchemaSelect, onSche
                                     <Button
                                         onClick={handleEdit}
                                         disabled={!editPrompt.trim()}
-                                        className="bg-blue-600 hover:bg-blue-700 text-white"
                                     >
                                         Update
                                     </Button>
                                 </div>
-                                <p className="text-xs text-earth-500 mt-1">
-                                    Example: "Add a genre field" or "Add an age field"
+                                <p className="text-xs text-muted-foreground mt-1">
+                                    Example: "Add a genre field" or "Remove name and age fields"
                                 </p>
                             </div>
                         )}

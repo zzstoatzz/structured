@@ -1,7 +1,8 @@
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { Loader2 } from 'lucide-react'
 import { type Schemas } from '../types'
+import { useEffect } from 'react'
+import { Loader2 } from 'lucide-react'
 
 interface InputSectionProps {
     input: string
@@ -18,36 +19,46 @@ export function InputSection({
     schemas,
     isLoading,
     onInputChange,
-    onSubmit
+    onSubmit,
 }: InputSectionProps) {
+    const schema = selectedSchema ? schemas[selectedSchema] : null
+    const placeholder = schema?.prompt || 'Select an output format above...'
+    const isDisabled = !selectedSchema || !input.trim() || isLoading
+
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && !isDisabled) {
+                e.preventDefault()
+                onSubmit()
+            }
+        }
+
+        window.addEventListener('keydown', handleKeyDown)
+        return () => window.removeEventListener('keydown', handleKeyDown)
+    }, [onSubmit, isDisabled])
+
     return (
         <div className="space-y-4">
             <Textarea
-                placeholder={selectedSchema
-                    ? schemas[selectedSchema].prompt ?? "Enter text to structure..."
-                    : "Select an output format above..."}
-                className="structured-output-textarea"
                 value={input}
                 onChange={(e) => onInputChange(e.target.value)}
-                disabled={!selectedSchema}
-                onKeyDown={(e) => {
-                    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && input.trim() && selectedSchema && !isLoading) {
-                        e.preventDefault()
-                        onSubmit()
-                    }
-                }}
+                placeholder={placeholder}
+                disabled={!selectedSchema || isLoading}
+                className={`min-h-[120px] resize-none transition-opacity duration-200 ${isLoading ? 'opacity-50' : ''}`}
             />
             <Button
-                className="structured-output-button"
                 onClick={onSubmit}
-                disabled={isLoading || !input.trim() || !selectedSchema}
+                disabled={isDisabled}
+                className="w-full"
             >
                 {isLoading ? (
-                    <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Processing...
-                    </>
-                ) : 'Generate (⌘ + Enter)'}
+                    <div className="flex items-center justify-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>Generating...</span>
+                    </div>
+                ) : (
+                    <span>Generate (⌘ + Enter)</span>
+                )}
             </Button>
         </div>
     )
