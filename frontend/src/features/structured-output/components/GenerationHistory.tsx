@@ -63,21 +63,12 @@ export function GenerationHistory({ schemaName, updateTrigger }: GenerationHisto
         }
         try {
             const response = await fetch(
-                `http://localhost:8000/generations/${schemaName}?favorites_only=${showFavoritesOnly}`
+                `http://localhost:8000/generations/${schemaName}`
             )
             if (!response.ok) throw new Error('Failed to fetch generations')
             const data = await response.json()
-            const sortedData = data.sort((a: Generation, b: Generation) => {
-                const dateA = new Date(a.created_at).getTime()
-                const dateB = new Date(b.created_at).getTime()
-                return dateB - dateA
-            })
-            setGenerations(sortedData)
-
-            // Only set selectedId if there's no current selection
-            if (!selectedId) {
-                setSelectedId(sortedData[0]?.id ?? null)
-            }
+            setGenerations(data)
+            setSelectedId(data[0]?.id ?? null)
         } catch (err) {
             setError('Failed to load generation history')
             console.error('Error fetching generations:', err)
@@ -150,6 +141,10 @@ export function GenerationHistory({ schemaName, updateTrigger }: GenerationHisto
         }
     }
 
+    const filteredGenerations = showFavoritesOnly
+        ? generations.filter(gen => gen.is_favorite)
+        : generations
+
     const toggleFavorite = async (e: React.MouseEvent, id: number) => {
         e.stopPropagation()
         try {
@@ -186,11 +181,7 @@ export function GenerationHistory({ schemaName, updateTrigger }: GenerationHisto
                         variant="ghost"
                         size="sm"
                         className={`text-xs ${showFavoritesOnly ? 'bg-muted' : ''}`}
-                        onClick={() => {
-                            setShowFavoritesOnly(!showFavoritesOnly)
-                            setSelectedId(null)
-                            fetchGenerations()
-                        }}
+                        onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
                     >
                         {showFavoritesOnly ? 'Show All' : 'Show Favorites'}
                     </Button>
@@ -200,13 +191,13 @@ export function GenerationHistory({ schemaName, updateTrigger }: GenerationHisto
                         <CardContent className="px-4 py-4">
                             {error ? (
                                 <div className="text-sm text-destructive font-medium">{error}</div>
-                            ) : generations.length === 0 ? (
+                            ) : filteredGenerations.length === 0 ? (
                                 <div className="text-sm text-muted-foreground">
                                     {showFavoritesOnly ? 'No favorite generations yet' : 'No generations yet'}
                                 </div>
                             ) : (
                                 <div className="space-y-3">
-                                    {generations.map((gen) => (
+                                    {filteredGenerations.map((gen) => (
                                         <div
                                             key={gen.id}
                                             className={`

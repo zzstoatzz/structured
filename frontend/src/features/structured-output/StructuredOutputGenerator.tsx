@@ -4,8 +4,7 @@ import { type Schemas } from './types'
 import { SchemaSelector } from './components/SchemaSelector'
 import { InputSection } from './components/InputSection'
 import { OutputDisplay } from './components/OutputDisplay'
-import { GenerationHistory } from './components/GenerationHistory'
-import { SchemaVersionHistory } from './components/SchemaVersionHistory'
+import { HistoryPanel } from './components/HistoryPanel'
 
 interface Props {
     className?: string
@@ -187,33 +186,16 @@ export function StructuredOutputGenerator({ className = '' }: Props) {
 
     return (
         <div className={`min-h-screen flex items-center justify-center p-12 ${className}`}>
-            <div className="w-[1200px]">
-                <div
-                    className={`
-                        grid gap-8 
-                        transition-all duration-300 ease-in-out
-                        ${hasGenerations ? 'grid-cols-[800px,1fr]' : 'grid-cols-[minmax(800px,_1fr),0fr]'}
-                    `}
-                >
-                    <div className="transition-transform duration-300 ease-in-out">
+            <div className="w-[1400px] max-w-[95vw]">
+                <div className="grid grid-cols-[minmax(0,_2fr),minmax(0,_1fr)] gap-8">
+                    <div>
                         {mainContent}
                     </div>
-                    <div
-                        className={`
-                            overflow-hidden transition-all duration-300 ease-in-out
-                            ${hasGenerations ? 'opacity-100' : 'opacity-0 w-0'}
-                        `}
-                    >
-                        <div className="space-y-4">
-                            <SchemaVersionHistory
-                                schemaName={selectedSchema || null}
-                                updateTrigger={updateTrigger}
-                            />
-                            <GenerationHistory
-                                schemaName={selectedSchema || null}
-                                updateTrigger={lastGenerationTime}
-                            />
-                        </div>
+                    <div className="min-w-0">
+                        <HistoryPanel
+                            schemaName={selectedSchema || null}
+                            updateTrigger={updateTrigger}
+                        />
                     </div>
                 </div>
             </div>

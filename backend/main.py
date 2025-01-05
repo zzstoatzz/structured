@@ -192,7 +192,9 @@ def get_generations(
     if favorites_only:
         query = query.filter(Generation.is_favorite == True)
 
-    generations = query.order_by(Generation.created_at.desc()).all()
+    generations = query.order_by(
+        Generation.id.desc()
+    ).all()  # Use ID for stable ordering
 
     return [
         GenerationResponse(
