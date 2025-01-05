@@ -4,14 +4,22 @@ import { type Schemas } from './types'
 import { SchemaSelector } from './components/SchemaSelector'
 import { InputSection } from './components/InputSection'
 import { OutputDisplay } from './components/OutputDisplay'
+import { GenerationHistory } from './components/GenerationHistory'
+import { SchemaVersionHistory } from './components/SchemaVersionHistory'
 
-export function StructuredOutputGenerator() {
+interface Props {
+    className?: string
+}
+
+export function StructuredOutputGenerator({ className = '' }: Props) {
     const [input, setInput] = useState('')
     const [response, setResponse] = useState('')
     const [isLoading, setIsLoading] = useState(false)
     const [selectedSchema, setSelectedSchema] = useState<string>('')
     const [schemas, setSchemas] = useState<Schemas>({})
     const [error, setError] = useState<string>('')
+    const [hasGenerations, setHasGenerations] = useState(false)
+    const [lastGenerationTime, setLastGenerationTime] = useState<number>(0)
 
     useEffect(() => {
         const fetchSchemas = async () => {
@@ -28,6 +36,26 @@ export function StructuredOutputGenerator() {
 
         fetchSchemas()
     }, [])
+
+    useEffect(() => {
+        const checkGenerations = async () => {
+            if (!selectedSchema) {
+                setHasGenerations(false)
+                return
+            }
+            try {
+                const response = await fetch(`http://localhost:8000/generations/${selectedSchema}`)
+                if (!response.ok) throw new Error('Failed to fetch generations')
+                const data = await response.json()
+                setHasGenerations(data.length > 0)
+            } catch (err) {
+                console.error('Error checking generations:', err)
+                setHasGenerations(false)
+            }
+        }
+
+        checkGenerations()
+    }, [selectedSchema, response])
 
     const handleSubmit = async () => {
         setIsLoading(true)
@@ -47,8 +75,8 @@ export function StructuredOutputGenerator() {
 
             const data = await response.json()
             setResponse(JSON.stringify(data, null, 2))
+            setLastGenerationTime(Date.now())
 
-            // Refresh schemas if we just created a new one
             if (selectedSchema === 'NewSchema') {
                 const schemasResponse = await fetch('http://localhost:8000/schemas')
                 if (schemasResponse.ok) {
@@ -77,7 +105,6 @@ export function StructuredOutputGenerator() {
             })
             if (!response.ok) throw new Error('Failed to delete schema')
 
-            // Refresh schemas after deletion
             const schemasResponse = await fetch('http://localhost:8000/schemas')
             if (!schemasResponse.ok) throw new Error('Failed to fetch schemas')
             const data = await schemasResponse.json()
@@ -99,7 +126,6 @@ export function StructuredOutputGenerator() {
             })
             if (!response.ok) throw new Error('Failed to update schema')
 
-            // Refresh schemas after update
             const schemasResponse = await fetch('http://localhost:8000/schemas')
             if (!schemasResponse.ok) throw new Error('Failed to fetch schemas')
             const data = await schemasResponse.json()
@@ -110,41 +136,79 @@ export function StructuredOutputGenerator() {
         }
     }
 
-    return (
-        <div className="structured-output-container">
-            <div className="structured-output">
-                <Card className="structured-output-card">
-                    <CardHeader className="border-b border-earth-200">
-                        <CardTitle className="text-earth-800 text-center">Structured Output Generator</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4 p-6">
-                        {error ? (
-                            <div className="text-red-500 text-sm">{error}</div>
-                        ) : (
-                            <>
-                                <SchemaSelector
-                                    schemas={schemas}
-                                    selectedSchema={selectedSchema}
-                                    onSchemaSelect={handleSchemaSelect}
-                                    onSchemaDelete={handleSchemaDelete}
-                                    onSchemaEdit={handleSchemaEdit}
-                                />
-                                <InputSection
-                                    input={input}
-                                    selectedSchema={selectedSchema}
-                                    schemas={schemas}
-                                    isLoading={isLoading}
-                                    onInputChange={setInput}
-                                    onSubmit={handleSubmit}
-                                />
+    const mainContent = (
+        <Card className="bg-card">
+            <CardHeader className="border-b border-border">
+                <CardTitle>Structured Output Generator</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col space-y-8 p-8">
+                {error ? (
+                    <div className="text-sm bg-destructive/10 border border-destructive/20 rounded-lg px-4 py-3 text-destructive" role="alert">
+                        {error}
+                    </div>
+                ) : (
+                    <div className="flex flex-col space-y-8">
+                        <div className="schema-selector">
+                            <SchemaSelector
+                                schemas={schemas}
+                                selectedSchema={selectedSchema}
+                                onSchemaSelect={handleSchemaSelect}
+                                onSchemaDelete={handleSchemaDelete}
+                                onSchemaEdit={handleSchemaEdit}
+                            />
+                        </div>
+                        <div className="input-section">
+                            <InputSection
+                                input={input}
+                                selectedSchema={selectedSchema}
+                                schemas={schemas}
+                                isLoading={isLoading}
+                                onInputChange={setInput}
+                                onSubmit={handleSubmit}
+                            />
+                        </div>
+                        {response && (
+                            <div className="output-section">
                                 <OutputDisplay
                                     response={response}
                                     schema={selectedSchema ? schemas[selectedSchema] : undefined}
                                 />
-                            </>
+                            </div>
                         )}
-                    </CardContent>
-                </Card>
+                    </div>
+                )}
+            </CardContent>
+        </Card>
+    )
+
+    return (
+        <div className={`min-h-screen flex items-center justify-center p-12 ${className}`}>
+            <div className="w-[1200px]">
+                <div
+                    className={`
+                        grid gap-8 
+                        transition-all duration-300 ease-in-out
+                        ${hasGenerations ? 'grid-cols-[800px,1fr]' : 'grid-cols-[minmax(800px,_1fr),0fr]'}
+                    `}
+                >
+                    <div className="transition-transform duration-300 ease-in-out">
+                        {mainContent}
+                    </div>
+                    <div
+                        className={`
+                            overflow-hidden transition-all duration-300 ease-in-out
+                            ${hasGenerations ? 'opacity-100' : 'opacity-0 w-0'}
+                        `}
+                    >
+                        <div className="space-y-4">
+                            <SchemaVersionHistory schemaName={selectedSchema || null} />
+                            <GenerationHistory
+                                schemaName={selectedSchema || null}
+                                updateTrigger={lastGenerationTime}
+                            />
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     )

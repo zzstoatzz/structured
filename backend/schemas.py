@@ -25,7 +25,8 @@ class SchemaDefinition(BaseModel):
         ..., description='a short description of the schema'
     )
     prompt: str = Field(
-        ..., description='the prompt to show users when using this schema'
+        ...,
+        description='short, friendly buzzfeed headline style question - ultimately prompt them for text to make an instance of this schema',
     )
     fields: list[SchemaField] = Field(
         ...,

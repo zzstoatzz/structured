@@ -6,8 +6,10 @@ import marvin
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict, Field, create_model
+from sqlalchemy.orm import Session
 
 from . import VERSION
+from .database import Generation, Schema, SchemaVersion, get_session
 from .logging import get_logger
 from .schemas import (
     BUILTIN_SCHEMAS,
@@ -23,6 +25,18 @@ class PromptRequest(BaseModel):
     """Prompt request"""
 
     prompt: str
+
+
+class GenerationResponse(BaseModel):
+    """Generation response"""
+
+    id: int
+    schema_name: str
+    prompt: str
+    output: dict[str, Any]
+    created_at: str
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 app = FastAPI(
@@ -43,6 +57,15 @@ app.add_middleware(
 def get_schema_service() -> SchemaService:
     """Get schema service instance"""
     return schema_service
+
+
+def get_db():
+    """Get database session"""
+    db = get_session()
+    try:
+        yield db
+    finally:
+        db.close()
 
 
 def create_pydantic_model(schema: SchemaDefinition) -> type[BaseModel]:
@@ -94,6 +117,7 @@ async def generate_structured_output(
     schema_name: str,
     request: PromptRequest,
     service: SchemaService = Depends(get_schema_service),
+    db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     """Generate structured output from a prompt"""
     if schema_name == 'NewSchema':
@@ -116,12 +140,56 @@ async def generate_structured_output(
     model = create_pydantic_model(schema)
     try:
         result = await marvin.cast_async(request.prompt, target=model)
-        return result.model_dump()
+        output = result.model_dump()
+
+        # Store the generation in the database
+        db_schema = db.query(Schema).filter(Schema.name == schema_name).first()
+        if db_schema:
+            generation = Generation(
+                schema_id=db_schema.id,
+                prompt=request.prompt,
+                output=output,
+            )
+            db.add(generation)
+            db.commit()
+
+        return output
     except Exception as e:
         logger.error(f'Generation failed: {e}')
         raise HTTPException(
             status_code=500, detail=f'Failed to generate output: {str(e)}'
         )
+
+
+@app.get('/generations/{schema_name}')
+def get_generations(
+    schema_name: str,
+    db: Session = Depends(get_db),
+) -> list[GenerationResponse]:
+    """Get generation history for a schema"""
+    schema = db.query(Schema).filter(Schema.name == schema_name).first()
+    if not schema:
+        raise HTTPException(
+            status_code=404, detail=f'Schema {schema_name} not found'
+        )
+
+    generations = (
+        db.query(Generation)
+        .filter(Generation.schema_id == schema.id)
+        .order_by(Generation.created_at.desc())
+        .all()
+    )
+
+    return [
+        GenerationResponse(
+            id=gen.id,
+            schema_name=schema_name,
+            prompt=gen.prompt,
+            output=gen.output,
+            created_at=gen.created_at.isoformat(),
+        )
+        for gen in generations
+    ]
 
 
 @app.delete('/schemas/{schema_name}')
@@ -141,6 +209,7 @@ async def update_schema(
     schema_name: str,
     request: PromptRequest,
     service: SchemaService = Depends(get_schema_service),
+    db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     """Update a schema using AI to transform it"""
     if not (old_schema := service.get(schema_name)):
@@ -165,10 +234,69 @@ async def update_schema(
             instructions=f"{request.prompt} - keep the name as '{schema_name}'",
         )
         updated_schema.name = schema_name  # ensure name stays the same
-        service.create(updated_schema)  # create will update if exists
+        
+        # Get the database schema
+        db_schema = db.query(Schema).filter(Schema.name == schema_name).first()
+        if not db_schema:
+            raise HTTPException(status_code=404, detail=f'Schema {schema_name} not found in database')
+            
+        # Create new version
+        new_version = SchemaVersion(
+            schema_id=db_schema.id,
+            version=(
+                db.query(SchemaVersion)
+                .filter(SchemaVersion.schema_id == db_schema.id)
+                .count() + 1
+            ),
+            description=updated_schema.description,
+            prompt=updated_schema.prompt,
+            fields=updated_schema.fields,
+            parent_version_id=db_schema.current_version_id,
+        )
+        db.add(new_version)
+        db.flush()  # to get the new version's id
+        
+        # Update schema's current version
+        db_schema.current_version_id = new_version.id
+        db.commit()
+        
+        service.create(updated_schema)  # update in memory service
         return updated_schema.model_dump()
     except Exception as e:
         logger.error(f'Schema update failed: {e}')
         raise HTTPException(
             status_code=500, detail=f'Failed to update schema: {str(e)}'
         )
+
+
+@app.get('/schemas/{schema_name}/versions')
+def get_schema_versions(
+    schema_name: str,
+    db: Session = Depends(get_db),
+) -> list[dict[str, Any]]:
+    """Get version history for a schema"""
+    schema = db.query(Schema).filter(Schema.name == schema_name).first()
+    if not schema:
+        raise HTTPException(
+            status_code=404, detail=f'Schema {schema_name} not found'
+        )
+
+    versions = (
+        db.query(SchemaVersion)
+        .filter(SchemaVersion.schema_id == schema.id)
+        .order_by(SchemaVersion.version.desc())
+        .all()
+    )
+
+    return [
+        {
+            'id': v.id,
+            'version': v.version,
+            'description': v.description,
+            'prompt': v.prompt,
+            'fields': v.fields,
+            'parent_version_id': v.parent_version_id,
+            'created_at': v.created_at.isoformat(),
+        }
+        for v in versions
+    ]

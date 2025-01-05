@@ -7,3 +7,6 @@ we use `uv` not `pip`
 - `uv run` is awesome! you can provide any bash, python, or even url of a python script to run
 - `uvx` is an alias for `uv tool run`
 - `uvx prefect server start` for example, installs prefect ephemerally and starts the server
+
+
+its shadcn/ui not shadcn-ui

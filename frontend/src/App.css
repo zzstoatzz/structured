@@ -1,15 +1,15 @@
 #root {
   min-height: 100vh;
   width: 100vw;
-  @apply bg-earth-100;
   display: flex;
   align-items: center;
   justify-content: center;
+  color: hsl(var(--foreground));
 }
 
 /* Component-specific styles */
 .structured-output-container {
-  @apply min-h-screen w-screen bg-earth-100 flex items-center justify-center p-4;
+  @apply min-h-screen w-screen flex items-center justify-center p-4;
 }
 
 .structured-output {
@@ -19,15 +19,15 @@
 }
 
 .structured-output-card {
-  @apply border-earth-200 bg-white/80 backdrop-blur-sm shadow-lg;
+  @apply bg-background/80 text-card-foreground border shadow-lg;
 }
 
 .structured-output-textarea {
-  @apply min-h-48 bg-earth-50 border-earth-200 focus:border-earth-300 focus:ring-earth-300;
+  @apply min-h-48 bg-background text-foreground border focus:ring-2 focus:ring-ring;
 }
 
 .structured-output-button {
-  @apply w-full bg-earth-600 hover:bg-earth-700 text-white;
+  @apply w-full bg-primary text-primary-foreground hover:bg-primary/90;
 }
 
 .structured-output-copy {
@@ -36,4 +36,40 @@
 
 .structured-output-response {
   @apply pt-6 relative min-h-48;
+}
+
+/* Input and output sections */
+.input-section,
+.output-section {
+  width: 100%;
+}
+
+.input-section textarea,
+.output-section pre {
+  width: 100%;
+  min-height: 120px;
+  padding: 1rem;
+  border-radius: var(--radius);
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  border: 1px solid hsl(var(--border));
+}
+
+/* Schema selector */
+.schema-selector {
+  width: 100%;
+  margin-bottom: 1rem;
+}
+
+/* Loading and error states */
+.loading {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.error {
+  color: hsl(var(--destructive));
+  padding: 1rem;
+  border-radius: var(--radius);
+  background-color: hsl(var(--destructive) / 0.1);
 }
