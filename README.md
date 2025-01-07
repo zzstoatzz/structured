@@ -1,5 +1,8 @@
 # structured
 
+> [!INFO]
+> see [demo](https://x.com/Nathan_Nowack/status/1874650896753479902)
+
 a web app for generating structured outputs from natural language prompts.
 
 ## features
