@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from . import VERSION
 from .database import Generation, Schema, get_session, init_db
 from .loggers import get_logger
+from .marvin_wrapper import safe_cast_async
 from .schemas import SchemaDefinition, SchemaService, schema_service
 
 logger = get_logger(__name__)
@@ -194,7 +195,7 @@ async def generate_structured_output(
 
         try:
             if schema_name == 'NewSchema':
-                result = await marvin.cast_async(
+                result = await safe_cast_async(
                     request.prompt,
                     target=SchemaDefinition,
                     instructions=(
@@ -209,7 +210,7 @@ async def generate_structured_output(
                 output = result.model_dump()
             else:
                 model = create_pydantic_model(schema)
-                result = await marvin.cast_async(request.prompt, target=model)
+                result = await safe_cast_async(request.prompt, target=model)
                 output = result.model_dump()
 
             try:
@@ -364,7 +365,7 @@ async def update_schema(
             f'Updating schema {schema_name} with prompt: {request.prompt}'
         )
         # Transform the schema but preserve the original name
-        updated_schema = await marvin.cast_async(
+        updated_schema = await safe_cast_async(
             old_schema,
             SchemaDefinition,
             instructions=f"{request.prompt} - keep the name as '{schema_name}'",
